@@ -28,7 +28,6 @@ import {
   Users,
   Clipboard,
   FileText,
-  HelpCircle,
   Sunrise,
   BookOpen
 } from 'lucide-react'
@@ -292,164 +291,22 @@ function StandupTab() {
   )
 }
 
-// ============ Help Desk Tab ============
-
-function HelpDeskTab() {
-  const [question, setQuestion] = useState('')
-  const [response, setResponse] = useState<HelpDeskResponse | null>(null)
-  const [showSources, setShowSources] = useState(false)
-
-  const askMutation = useMutation({
-    mutationFn: askHelpDesk,
-    onSuccess: setResponse
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!question.trim() || askMutation.isPending) return
-    askMutation.mutate(question)
-  }
-
-  const confidenceColors = {
-    high: 'bg-green-500/10 text-green-600 border-green-500/20',
-    medium: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-    low: 'bg-red-500/10 text-red-600 border-red-500/20'
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask about food safety, HR policies, procedures..."
-              disabled={askMutation.isPending}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={askMutation.isPending || !question.trim()}>
-              {askMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Badge
-              variant="outline"
-              className="cursor-pointer hover:bg-muted"
-              onClick={() => setQuestion('What are the hand washing requirements?')}
-            >
-              Hand washing
-            </Badge>
-            <Badge
-              variant="outline"
-              className="cursor-pointer hover:bg-muted"
-              onClick={() => setQuestion('How do I handle a food safety incident?')}
-            >
-              Food safety
-            </Badge>
-            <Badge
-              variant="outline"
-              className="cursor-pointer hover:bg-muted"
-              onClick={() => setQuestion('What is the vacation policy?')}
-            >
-              Vacation policy
-            </Badge>
-            <Badge
-              variant="outline"
-              className="cursor-pointer hover:bg-muted"
-              onClick={() => setQuestion('How do I store food properly?')}
-            >
-              Food storage
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      {askMutation.isPending && (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-            <p className="mt-2 text-sm text-muted-foreground">Searching training materials...</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {response && !askMutation.isPending && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                Answer
-              </CardTitle>
-              <Badge className={confidenceColors[response.confidence]}>
-                {response.confidence} confidence
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <MarkdownMessage content={response.answer} />
-            </div>
-
-            {response.sources && response.sources.length > 0 && (
-              <div className="mt-4 pt-3 border-t">
-                <button
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowSources(!showSources)}
-                >
-                  <FileText className="h-3 w-3" />
-                  {response.sources.length} source{response.sources.length > 1 ? 's' : ''}
-                  {showSources ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                </button>
-
-                {showSources && (
-                  <div className="mt-2 space-y-2">
-                    {response.source_snippets?.map((snippet, i) => (
-                      <div key={i} className="p-2 bg-muted rounded text-xs">
-                        <div className="flex items-center gap-1 font-medium mb-1">
-                          <FileText className="h-3 w-3" />
-                          {snippet.file}
-                        </div>
-                        <p className="text-muted-foreground">{snippet.text}...</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {!response && !askMutation.isPending && (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <HelpCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="font-semibold mb-2">Ask the Help Desk</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Search our training materials for answers about food safety, HR policies,
-              procedures, and more. Answers are sourced directly from official documents.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-}
-
 // ============ Chat Tab ============
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant' | 'helpdesk'
+  content: string
+  helpdesk?: HelpDeskResponse
+}
 
 function ChatTab() {
   const [input, setInput] = useState('')
   const [showSessions, setShowSessions] = useState(false)
   const [showMemories, setShowMemories] = useState(false)
   const [allMemories, setAllMemories] = useState<MemoryItem[]>([])
+  const [helpdeskLoading, setHelpdeskLoading] = useState(false)
+  const [helpdeskMessages, setHelpdeskMessages] = useState<ChatMessage[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const {
@@ -502,6 +359,39 @@ function ChatTab() {
   const handleSaveAsMemory = async (content: string) => {
     const memoryContent = content.length > 200 ? content.slice(0, 200) + '...' : content
     await saveMemory(memoryContent, 'fact')
+  }
+
+  const handleHelpDeskQuery = async (question: string) => {
+    if (!question.trim() || helpdeskLoading) return
+
+    // Add user message
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: question
+    }
+    setHelpdeskMessages(prev => [...prev, userMsg])
+    setHelpdeskLoading(true)
+
+    try {
+      const response = await askHelpDesk(question)
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'helpdesk',
+        content: response.answer,
+        helpdesk: response
+      }
+      setHelpdeskMessages(prev => [...prev, assistantMsg])
+    } catch {
+      const errorMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'helpdesk',
+        content: 'Sorry, I could not search the training materials. Please try again.'
+      }
+      setHelpdeskMessages(prev => [...prev, errorMsg])
+    } finally {
+      setHelpdeskLoading(false)
+    }
   }
 
   const buildContextPrompt = (action: string): string => {
@@ -610,8 +500,8 @@ Sites:\n`
       )}
 
       {/* Quick Actions */}
-      {messages.length === 0 && (
-        <div className="grid gap-3 md:grid-cols-3 mb-6">
+      {messages.length === 0 && helpdeskMessages.length === 0 && (
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4 mb-6">
           <Card
             className="cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => handleQuickAction(buildContextPrompt('Analyze the current inventory status. What are the key insights and any concerns?'))}
@@ -650,11 +540,25 @@ Sites:\n`
               </p>
             </CardContent>
           </Card>
+
+          <Card
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => handleHelpDeskQuery('What are the key food safety requirements I should know?')}
+          >
+            <CardContent className="p-4">
+              <BookOpen className="h-8 w-8 text-green-500 mb-2" />
+              <h3 className="font-semibold">Search Training</h3>
+              <p className="text-sm text-muted-foreground">
+                Find answers in training materials
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+        {/* Regular chat messages */}
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -691,6 +595,61 @@ Sites:\n`
           </div>
         ))}
 
+        {/* Help desk messages */}
+        {helpdeskMessages.map((msg) => (
+          <div
+            key={msg.id}
+            className={cn(
+              "flex group",
+              msg.role === 'user' ? 'justify-end' : 'justify-start'
+            )}
+          >
+            <div
+              className={cn(
+                "max-w-[80%] rounded-lg px-4 py-3 relative",
+                msg.role === 'user'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-green-500/10 border border-green-500/20'
+              )}
+            >
+              {msg.role === 'helpdesk' && msg.helpdesk && (
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="h-4 w-4 text-green-600" />
+                  <span className="text-xs font-medium text-green-600">Training Materials</span>
+                  <Badge className={cn(
+                    "text-xs",
+                    msg.helpdesk.confidence === 'high' && 'bg-green-500/10 text-green-600 border-green-500/20',
+                    msg.helpdesk.confidence === 'medium' && 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+                    msg.helpdesk.confidence === 'low' && 'bg-red-500/10 text-red-600 border-red-500/20'
+                  )}>
+                    {msg.helpdesk.confidence}
+                  </Badge>
+                </div>
+              )}
+              {msg.role === 'helpdesk' ? (
+                <>
+                  <MarkdownMessage content={msg.content} className="text-sm" />
+                  {msg.helpdesk?.sources && msg.helpdesk.sources.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-green-500/20">
+                      <p className="text-xs text-muted-foreground mb-1">Sources:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {msg.helpdesk.sources.slice(0, 3).map((source, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            <FileText className="h-3 w-3 mr-1" />
+                            {source}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+              )}
+            </div>
+          </div>
+        ))}
+
         {streamingContent && (
           <div className="flex justify-start">
             <div className="max-w-[80%] rounded-lg px-4 py-3 bg-muted">
@@ -708,26 +667,72 @@ Sites:\n`
           </div>
         )}
 
+        {helpdeskLoading && (
+          <div className="flex justify-start">
+            <div className="rounded-lg px-4 py-3 bg-green-500/10 border border-green-500/20">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                <span className="text-sm text-green-600">Searching training materials...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about your inventory, sites, or notes..."
-          disabled={isLoading}
-          className="flex-1"
-        />
-        <Button type="submit" disabled={isLoading || !input.trim()}>
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </form>
+      <div className="space-y-2">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about inventory, sites, notes, or training materials..."
+            disabled={isLoading || helpdeskLoading}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={isLoading || helpdeskLoading || !input.trim()}>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </form>
+
+        {/* Help desk quick queries */}
+        <div className="flex flex-wrap gap-2">
+          <span className="text-xs text-muted-foreground self-center">Training:</span>
+          <Badge
+            variant="outline"
+            className="cursor-pointer hover:bg-green-500/10 hover:border-green-500/30 text-xs"
+            onClick={() => handleHelpDeskQuery('What are the hand washing requirements?')}
+          >
+            Hand washing
+          </Badge>
+          <Badge
+            variant="outline"
+            className="cursor-pointer hover:bg-green-500/10 hover:border-green-500/30 text-xs"
+            onClick={() => handleHelpDeskQuery('How do I handle a food safety incident?')}
+          >
+            Food safety
+          </Badge>
+          <Badge
+            variant="outline"
+            className="cursor-pointer hover:bg-green-500/10 hover:border-green-500/30 text-xs"
+            onClick={() => handleHelpDeskQuery('How do I store food properly?')}
+          >
+            Food storage
+          </Badge>
+          <Badge
+            variant="outline"
+            className="cursor-pointer hover:bg-green-500/10 hover:border-green-500/30 text-xs"
+            onClick={() => handleHelpDeskQuery('What is the vacation policy?')}
+          >
+            HR policies
+          </Badge>
+        </div>
+      </div>
     </div>
   )
 }
@@ -785,7 +790,7 @@ export function AssistantPage() {
       </div>
 
       <Tabs defaultValue="chat" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-2 max-w-xs">
           <TabsTrigger value="chat" className="gap-2">
             <MessageSquare className="h-4 w-4" />
             Chat
@@ -793,10 +798,6 @@ export function AssistantPage() {
           <TabsTrigger value="standup" className="gap-2">
             <Sunrise className="h-4 w-4" />
             Standup
-          </TabsTrigger>
-          <TabsTrigger value="helpdesk" className="gap-2">
-            <HelpCircle className="h-4 w-4" />
-            Help Desk
           </TabsTrigger>
         </TabsList>
 
@@ -806,10 +807,6 @@ export function AssistantPage() {
 
         <TabsContent value="standup">
           <StandupTab />
-        </TabsContent>
-
-        <TabsContent value="helpdesk">
-          <HelpDeskTab />
         </TabsContent>
       </Tabs>
     </div>
