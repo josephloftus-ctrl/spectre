@@ -868,3 +868,350 @@ export const createMemoryNote = async (
     const { data } = await api.post('/memory/note', formData);
     return data;
 };
+
+// ============== Shopping Cart API ==============
+
+export interface CartItem {
+    id: string;
+    site_id: string;
+    sku: string;
+    description: string;
+    quantity: number;
+    unit_price: number | null;
+    uom: string | null;
+    vendor: string | null;
+    notes: string | null;
+    source: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CartSummary {
+    site_id: string;
+    item_count: number;
+    total_quantity: number;
+    total_value: number;
+}
+
+export interface CartResponse {
+    site_id: string;
+    items: CartItem[];
+    summary: CartSummary;
+}
+
+export const fetchCart = async (siteId: string): Promise<CartResponse> => {
+    const { data } = await api.get(`/cart/${siteId}`);
+    return data;
+};
+
+export const addToCart = async (
+    siteId: string,
+    item: {
+        sku: string;
+        description: string;
+        quantity?: number;
+        unit_price?: number;
+        uom?: string;
+        vendor?: string;
+        notes?: string;
+        source?: string;
+    }
+): Promise<{ success: boolean; item: CartItem }> => {
+    const { data } = await api.post(`/cart/${siteId}/add`, item);
+    return data;
+};
+
+export const bulkAddToCart = async (
+    siteId: string,
+    items: Array<{
+        sku: string;
+        description: string;
+        quantity?: number;
+        unit_price?: number;
+        uom?: string;
+        vendor?: string;
+        notes?: string;
+    }>,
+    source: string = 'bulk'
+): Promise<{ success: boolean; added_count: number; summary: CartSummary }> => {
+    const { data } = await api.post(`/cart/${siteId}/bulk`, { items, source });
+    return data;
+};
+
+export const updateCartItemQuantity = async (
+    siteId: string,
+    sku: string,
+    quantity: number
+): Promise<{ success: boolean; item: CartItem }> => {
+    const formData = new FormData();
+    formData.append('quantity', quantity.toString());
+    const { data } = await api.put(`/cart/${siteId}/${encodeURIComponent(sku)}`, formData);
+    return data;
+};
+
+export const removeFromCart = async (
+    siteId: string,
+    sku: string
+): Promise<{ success: boolean; message: string }> => {
+    const { data } = await api.delete(`/cart/${siteId}/${encodeURIComponent(sku)}`);
+    return data;
+};
+
+export const clearCart = async (
+    siteId: string
+): Promise<{ success: boolean; cleared_count: number }> => {
+    const { data } = await api.delete(`/cart/${siteId}`);
+    return data;
+};
+
+// ============== Count Session API ==============
+
+export interface CountSession {
+    id: string;
+    site_id: string;
+    name: string;
+    status: 'active' | 'completed' | 'exported';
+    item_count: number;
+    total_value: number;
+    created_at: string;
+    updated_at: string;
+    completed_at: string | null;
+}
+
+export interface CountItem {
+    id: string;
+    session_id: string;
+    sku: string;
+    description: string;
+    counted_qty: number;
+    expected_qty: number | null;
+    unit_price: number | null;
+    uom: string | null;
+    location: string | null;
+    variance: number | null;
+    notes: string | null;
+    counted_at: string;
+}
+
+export const fetchCountSessions = async (params?: {
+    siteId?: string;
+    status?: string;
+    limit?: number;
+}): Promise<{ sessions: CountSession[]; count: number }> => {
+    const { data } = await api.get('/count-sessions', {
+        params: {
+            site_id: params?.siteId,
+            status: params?.status,
+            limit: params?.limit
+        }
+    });
+    return data;
+};
+
+export const createCountSession = async (
+    siteId: string,
+    name?: string
+): Promise<{ success: boolean; session: CountSession }> => {
+    const formData = new FormData();
+    formData.append('site_id', siteId);
+    if (name) formData.append('name', name);
+    const { data } = await api.post('/count-sessions', formData);
+    return data;
+};
+
+export const fetchCountSession = async (
+    sessionId: string
+): Promise<{ session: CountSession; items: CountItem[]; item_count: number }> => {
+    const { data } = await api.get(`/count-sessions/${sessionId}`);
+    return data;
+};
+
+export const updateCountSession = async (
+    sessionId: string,
+    updates: { status?: string; name?: string }
+): Promise<{ success: boolean; session: CountSession }> => {
+    const formData = new FormData();
+    if (updates.status) formData.append('status', updates.status);
+    if (updates.name) formData.append('name', updates.name);
+    const { data } = await api.put(`/count-sessions/${sessionId}`, formData);
+    return data;
+};
+
+export const addCountItem = async (
+    sessionId: string,
+    item: {
+        sku: string;
+        description: string;
+        counted_qty: number;
+        expected_qty?: number;
+        unit_price?: number;
+        uom?: string;
+        location?: string;
+        notes?: string;
+    }
+): Promise<{ success: boolean; item: CountItem }> => {
+    const { data } = await api.post(`/count-sessions/${sessionId}/items`, item);
+    return data;
+};
+
+export const deleteCountSession = async (
+    sessionId: string
+): Promise<{ success: boolean; message: string }> => {
+    const { data } = await api.delete(`/count-sessions/${sessionId}`);
+    return data;
+};
+
+// ============== Inventory Snapshot API (Safe State Return) ==============
+
+export interface InventorySnapshot {
+    id: string;
+    site_id: string;
+    name: string;
+    source_file_id: string | null;
+    snapshot_data: InventoryItem[];
+    item_count: number;
+    total_value: number;
+    status: 'active' | 'restored' | 'archived';
+    created_at: string;
+}
+
+export interface InventoryItem {
+    sku: string;
+    description: string;
+    quantity: number;
+    uom: string | null;
+    unit_price: number | null;
+    vendor: string | null;
+    location: string | null;
+}
+
+export const fetchInventorySnapshots = async (
+    siteId: string,
+    status?: string,
+    limit?: number
+): Promise<{ snapshots: Omit<InventorySnapshot, 'snapshot_data'>[]; count: number }> => {
+    const { data } = await api.get(`/inventory/snapshots/${siteId}`, {
+        params: { status, limit }
+    });
+    return data;
+};
+
+export const fetchLatestSnapshot = async (
+    siteId: string
+): Promise<InventorySnapshot> => {
+    const { data } = await api.get(`/inventory/snapshots/${siteId}/latest`);
+    return data;
+};
+
+export const fetchSnapshot = async (
+    snapshotId: string
+): Promise<InventorySnapshot> => {
+    const { data } = await api.get(`/inventory/snapshot/${snapshotId}`);
+    return data;
+};
+
+export const restoreSnapshot = async (
+    snapshotId: string
+): Promise<{ success: boolean; message: string; snapshot: InventorySnapshot }> => {
+    const { data } = await api.post(`/inventory/snapshot/${snapshotId}/restore`);
+    return data;
+};
+
+export const deleteSnapshot = async (
+    snapshotId: string
+): Promise<{ success: boolean; message: string }> => {
+    const { data } = await api.delete(`/inventory/snapshot/${snapshotId}`);
+    return data;
+};
+
+// ============== Auto-Clean & Purchase Match Integration ==============
+
+export interface CleanedInventoryResult {
+    site_id: string;
+    snapshot_id: string | null;
+    original_count: number;
+    cleaned_count: number;
+    fixes_applied: Array<{
+        original_sku: string;
+        corrected_sku: string;
+        description: string;
+        similarity: number;
+    }>;
+    cleaned_items: InventoryItem[];
+}
+
+export const autoCleanInventory = async (
+    siteId: string,
+    options?: {
+        createSnapshot?: boolean;
+        applyTypoFixes?: boolean;
+    }
+): Promise<CleanedInventoryResult> => {
+    const formData = new FormData();
+    formData.append('create_snapshot', (options?.createSnapshot ?? true).toString());
+    formData.append('apply_typo_fixes', (options?.applyTypoFixes ?? true).toString());
+    const { data } = await api.post(`/inventory/auto-clean/${siteId}`, formData);
+    return data;
+};
+
+export const addPurchaseMatchToCart = async (
+    siteId: string,
+    category: 'orderable' | 'likely_typos' | 'unknown',
+    applyCorrections: boolean = true
+): Promise<{ success: boolean; added_count: number; category: string; summary: CartSummary }> => {
+    const formData = new FormData();
+    formData.append('category', category);
+    formData.append('apply_corrections', applyCorrections.toString());
+    const { data } = await api.post(`/purchase-match/${siteId}/add-to-cart`, formData);
+    return data;
+};
+
+// ============== Export API ==============
+
+export const exportCart = (siteId: string): string => {
+    return `${api.defaults.baseURL}/export/cart/${siteId}`;
+};
+
+export const exportCountSession = (sessionId: string): string => {
+    return `${api.defaults.baseURL}/export/count-session/${sessionId}`;
+};
+
+export const exportInventory = async (
+    siteId: string,
+    options?: {
+        includeModifications?: boolean;
+        items?: Array<{
+            sku: string;
+            description: string;
+            quantity: number;
+            uom?: string;
+            unit_price?: number;
+            location?: string;
+        }>;
+    }
+): Promise<Blob> => {
+    const formData = new FormData();
+    if (options?.includeModifications) {
+        formData.append('include_modifications', 'true');
+    }
+    if (options?.items) {
+        formData.append('items', JSON.stringify(options.items));
+    }
+
+    const response = await api.post(`/export/inventory/${siteId}`, formData, {
+        responseType: 'blob'
+    });
+    return response.data;
+};
+
+// Helper function to trigger download
+export const downloadFile = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};
