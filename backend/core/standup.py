@@ -16,17 +16,15 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, date
 from dataclasses import dataclass, asdict
 
-from .embeddings import search, OLLAMA_URL
+from .embeddings import search
 from .corpus import KNOWLEDGE_COLLECTION
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
 # Cache directory for pre-baked content
 CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "standup_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-# LLM settings - standardized on granite4:3b for all AI features
-LLM_MODEL = "granite4:3b"
 
 
 @dataclass
@@ -49,9 +47,9 @@ def get_llm_response(prompt: str, system: str = "", temperature: float = 0.7) ->
         messages.append({"role": "user", "content": prompt})
 
         response = requests.post(
-            f"{OLLAMA_URL}/api/chat",
+            f"{settings.OLLAMA_URL}/api/chat",
             json={
-                "model": LLM_MODEL,
+                "model": settings.LLM_MODEL,
                 "messages": messages,
                 "stream": False,
                 "options": {"temperature": temperature}

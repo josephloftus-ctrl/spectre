@@ -989,18 +989,36 @@ def add_cart_item(
     notes: Optional[str] = None,
     source: str = "manual"
 ) -> Dict[str, Any]:
-    """Add or update an item in the shopping cart."""
+    """Add or update an item in the shopping cart.
+
+    Preserves the original ID when updating an existing item.
+    """
     import uuid
-    item_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
     with get_db() as conn:
-        # Use INSERT OR REPLACE to handle duplicates (unique on site_id, sku)
-        conn.execute("""
-            INSERT OR REPLACE INTO cart_items
-            (id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (item_id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, now, now))
+        # Check if item already exists
+        existing = conn.execute(
+            "SELECT id, created_at FROM cart_items WHERE site_id = ? AND sku = ?",
+            (site_id, sku)
+        ).fetchone()
+
+        if existing:
+            # Update existing item, preserve original ID and created_at
+            conn.execute("""
+                UPDATE cart_items
+                SET description = ?, quantity = ?, unit_price = ?, uom = ?,
+                    vendor = ?, notes = ?, source = ?, updated_at = ?
+                WHERE site_id = ? AND sku = ?
+            """, (description, quantity, unit_price, uom, vendor, notes, source, now, site_id, sku))
+        else:
+            # Insert new item with new UUID
+            item_id = str(uuid.uuid4())
+            conn.execute("""
+                INSERT INTO cart_items
+                (id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (item_id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, now, now))
 
     return get_cart_item(site_id, sku)
 

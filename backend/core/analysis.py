@@ -8,7 +8,6 @@ Provides:
 """
 
 import json
-import os
 import requests
 from datetime import datetime
 from typing import Optional
@@ -18,10 +17,7 @@ from backend.core.database import (
     get_db, get_file, FileStatus
 )
 from backend.core.engine import parse_excel_file, parse_csv_file
-
-# Ollama configuration
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-ANALYSIS_MODEL = "granite4:3b"  # Use smaller model for analysis tasks
+from backend.core.config import settings
 
 # Alert thresholds for change detection
 VALUE_CHANGE_ALERT_THRESHOLD = 20.0   # Percent change to trigger value alert
@@ -34,10 +30,10 @@ ANALYSIS_ROWS_LIMIT = 50              # Max rows to send for AI analysis
 def check_ollama_available() -> bool:
     """Check if Ollama is running and model is available."""
     try:
-        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        resp = requests.get(f"{settings.OLLAMA_URL}/api/tags", timeout=5)
         if resp.ok:
             models = [m['name'] for m in resp.json().get('models', [])]
-            return any(ANALYSIS_MODEL in m for m in models)
+            return any(settings.ANALYSIS_MODEL in m for m in models)
         return False
     except Exception:
         return False
@@ -47,7 +43,7 @@ def generate_completion(prompt: str, system: str = None, max_tokens: int = 1000)
     """Generate a completion using Ollama."""
     try:
         payload = {
-            "model": ANALYSIS_MODEL,
+            "model": settings.ANALYSIS_MODEL,
             "prompt": prompt,
             "stream": False,
             "options": {
@@ -59,7 +55,7 @@ def generate_completion(prompt: str, system: str = None, max_tokens: int = 1000)
             payload["system"] = system
 
         resp = requests.post(
-            f"{OLLAMA_URL}/api/generate",
+            f"{settings.OLLAMA_URL}/api/generate",
             json=payload,
             timeout=120
         )

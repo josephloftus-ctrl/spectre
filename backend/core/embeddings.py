@@ -31,12 +31,9 @@ from .collections import (
     get_chroma_client,
     CHROMA_DIR
 )
+from .config import settings
 
 logger = logging.getLogger(__name__)
-
-# Configuration
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-EMBED_MODEL = "nomic-embed-text:v1.5"
 
 # Chunking settings
 MAX_CHUNK_SIZE = 500  # characters
@@ -60,9 +57,9 @@ def embed_text(text: str) -> Optional[List[float]]:
     """
     try:
         response = requests.post(
-            f"{OLLAMA_URL}/api/embeddings",
+            f"{settings.OLLAMA_URL}/api/embeddings",
             json={
-                "model": EMBED_MODEL,
+                "model": settings.EMBED_MODEL,
                 "prompt": text
             },
             timeout=30
@@ -439,7 +436,7 @@ def get_embedding_stats(collection_name: Optional[str] = None) -> Dict[str, Any]
                 "available": True,
                 "collection": collection_name,
                 "total_chunks": count,
-                "model": EMBED_MODEL
+                "model": settings.EMBED_MODEL
             }
         except Exception as e:
             return {"available": False, "error": str(e)}
@@ -452,7 +449,7 @@ def get_embedding_stats(collection_name: Optional[str] = None) -> Dict[str, Any]
             "available": True,
             "collections": collections,
             "total_chunks": total_chunks,
-            "model": EMBED_MODEL
+            "model": settings.EMBED_MODEL
         }
 
 
@@ -505,7 +502,7 @@ def reset_collection(collection_name: Optional[str] = None) -> Dict[str, Any]:
                 )
                 logger.info(f"Created collection: {name}")
 
-            return {"success": True, "message": f"All collections reset. Ready for {EMBED_MODEL}"}
+            return {"success": True, "message": f"All collections reset. Ready for {settings.EMBED_MODEL}"}
 
     except Exception as e:
         logger.error(f"Failed to reset collection: {e}")

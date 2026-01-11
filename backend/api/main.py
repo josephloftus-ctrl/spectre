@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -14,6 +14,7 @@ import sys
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from backend.core.engine import collect_site_metrics
+from backend.core.config import settings
 from backend.core.database import (
     get_file, list_files, get_job, list_jobs, get_stats,
     FileStatus, JobStatus, JobType, retry_failed_jobs
@@ -65,15 +66,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Spectre Inventory Platform", version="2.0.0", lifespan=lifespan)
 
-# CORS - Use environment variable for allowed origins in production
-ALLOWED_ORIGINS = os.environ.get(
-    "ALLOWED_ORIGINS",
-    "http://localhost:8090,http://localhost:5173,http://127.0.0.1:8090"
-).split(",")
-
+# CORS - Use centralized settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
@@ -603,7 +599,6 @@ def ai_briefing(date: Optional[str] = Query(None)):
     # Generate AI summary if Ollama is available
     try:
         import requests
-        OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
         # Build prompt
         prompt_parts = [f"Today is {target_date}. Give a brief morning briefing."]
@@ -624,9 +619,9 @@ def ai_briefing(date: Optional[str] = Query(None)):
         prompt = " ".join(prompt_parts) + " Keep it under 100 words."
 
         response = requests.post(
-            f"{OLLAMA_URL}/api/generate",
+            f"{settings.OLLAMA_URL}/api/generate",
             json={
-                "model": "llama3.2:latest",
+                "model": settings.LLM_MODEL,
                 "prompt": prompt,
                 "stream": False
             },
@@ -1712,7 +1707,6 @@ def helpdesk_ask(
     # Generate answer with LLM
     try:
         import requests
-        OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
         prompt = f"""Based on the following training materials, answer this question:
 
@@ -1731,9 +1725,9 @@ Instructions:
 ANSWER:"""
 
         response = requests.post(
-            f"{OLLAMA_URL}/api/chat",
+            f"{settings.OLLAMA_URL}/api/chat",
             json={
-                "model": "granite4:3b",
+                "model": settings.LLM_MODEL,
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant answering questions about food service operations, safety, and HR policies based on company training materials."},
                     {"role": "user", "content": prompt}
@@ -2082,15 +2076,18 @@ from backend.core.xlsx_export import (
 
 @app.get("/api/export/cart/{site_id}")
 def export_cart(site_id: str):
-    """Export shopping cart as OrderMaestro-compatible XLSX."""
+    """Export shopping cart as OrderMaestro-compatible XLSX using streaming."""
     try:
         buffer = export_cart_from_db(site_id)
         site_name = get_site_display_name(site_id)
         filename = f"Cart_{site_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         safe_filename = sanitize_filename(filename)
 
-        return Response(
-            content=buffer.getvalue(),
+        def iterfile():
+            yield buffer.getvalue()
+
+        return StreamingResponse(
+            iterfile(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{safe_filename}"
@@ -2102,7 +2099,7 @@ def export_cart(site_id: str):
 
 @app.get("/api/export/count-session/{session_id}")
 def export_count_session(session_id: str):
-    """Export count session as OrderMaestro-compatible XLSX."""
+    """Export count session as OrderMaestro-compatible XLSX using streaming."""
     try:
         buffer = export_count_session_from_db(session_id)
         session = get_count_session(session_id)
@@ -2110,8 +2107,11 @@ def export_count_session(session_id: str):
         filename = f"Count_{site_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         safe_filename = sanitize_filename(filename)
 
-        return Response(
-            content=buffer.getvalue(),
+        def iterfile():
+            yield buffer.getvalue()
+
+        return StreamingResponse(
+            iterfile(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{safe_filename}"
@@ -2130,7 +2130,7 @@ def export_inventory(
     items: Optional[str] = Form(None)  # JSON array of items
 ):
     """
-    Export inventory as OrderMaestro-compatible XLSX.
+    Export inventory as OrderMaestro-compatible XLSX using streaming.
 
     Can export from:
     - Database (parsed files)
@@ -2159,8 +2159,11 @@ def export_inventory(
         filename = f"Inventory_{site_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
         safe_filename = sanitize_filename(filename)
 
-        return Response(
-            content=buffer.getvalue(),
+        def iterfile():
+            yield buffer.getvalue()
+
+        return StreamingResponse(
+            iterfile(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{safe_filename}"
