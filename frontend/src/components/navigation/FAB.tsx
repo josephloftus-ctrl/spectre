@@ -49,16 +49,18 @@ export function FAB({ onAddNote, onReportIssue, onQuickCount }: FABProps) {
     setIsExpanded(false)
     if (onReportIssue) {
       onReportIssue()
+    } else {
+      console.log('Issue reporting not yet implemented')
     }
-    // TODO: Implement issue reporting
   }, [onReportIssue])
 
   const handleQuickCount = useCallback(() => {
     setIsExpanded(false)
     if (onQuickCount) {
       onQuickCount()
+    } else {
+      console.log('Quick count not yet implemented')
     }
-    // TODO: Implement quick count
   }, [onQuickCount])
 
   const actions: FABAction[] = [
