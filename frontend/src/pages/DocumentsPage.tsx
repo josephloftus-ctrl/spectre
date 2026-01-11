@@ -7,11 +7,17 @@ import {
   FileSpreadsheet, Search, RefreshCw, Loader2,
   CheckCircle2, AlertCircle, Clock, Cog,
   FolderOpen, Unplug, Radio, Book, Utensils, Brain,
-  Upload, Files
+  Upload, Files, Trash2, Database, MoreVertical
 } from 'lucide-react'
 import { DropZone, FileCard, FileStatus as InboxFileStatus } from '@/components/inbox'
 import { useFolderPicker } from '@/hooks'
-import { uploadFile, fetchFiles, retryFile, fetchCollections, FileRecord, FileStatus, CollectionInfo } from '@/lib/api'
+import { uploadFile, fetchFiles, retryFile, deleteFile, reembedFile, fetchCollections, FileRecord, FileStatus, CollectionInfo } from '@/lib/api'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils'
 
 // ============ Shared Constants ============
@@ -63,14 +69,19 @@ interface PendingFile {
 interface DocumentCardProps {
   file: FileRecord
   onRetry: (id: string) => void
+  onDelete: (id: string) => void
+  onReembed: (id: string) => void
   retrying: boolean
+  deleting: boolean
+  reembedding: boolean
 }
 
 // ============ Document Card Component ============
 
-function DocumentCard({ file, onRetry, retrying }: DocumentCardProps) {
+function DocumentCard({ file, onRetry, onDelete, onReembed, retrying, deleting, reembedding }: DocumentCardProps) {
   const status = statusConfig[file.status]
   const StatusIcon = status.icon
+  const isLoading = retrying || deleting || reembedding
 
   return (
     <Card className={cn(file.status === 'failed' && 'border-destructive/50')}>
@@ -100,21 +111,45 @@ function DocumentCard({ file, onRetry, retrying }: DocumentCardProps) {
               <StatusIcon className={cn('h-3.5 w-3.5', file.status === 'processing' && 'animate-spin')} />
               {status.label}
             </div>
-            {file.status === 'failed' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onRetry(file.id)}
-                disabled={retrying}
-              >
-                {retrying ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3 w-3" />
-                )}
-                <span className="ml-1">Retry</span>
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {file.status === 'failed' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRetry(file.id)}
+                  disabled={isLoading}
+                >
+                  {retrying ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  <span className="ml-1">Retry</span>
+                </Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" disabled={isLoading}>
+                    {isLoading && !retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <MoreVertical className="h-3 w-3" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {file.status === 'completed' && (
+                    <DropdownMenuItem onClick={() => onReembed(file.id)}>
+                      <Database className="h-4 w-4 mr-2" />
+                      Re-embed
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() => onDelete(file.id)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -393,6 +428,8 @@ function FilesTab() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set())
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const [reembeddingIds, setReembeddingIds] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
@@ -430,6 +467,41 @@ function FilesTab() {
       console.error('Failed to retry file:', error)
     } finally {
       setRetryingIds(prev => {
+        const next = new Set(prev)
+        next.delete(fileId)
+        return next
+      })
+    }
+  }
+
+  const handleDelete = async (fileId: string) => {
+    if (!confirm('Are you sure you want to delete this file? This will remove the file, its embeddings, and all associated data.')) {
+      return
+    }
+    setDeletingIds(prev => new Set(prev).add(fileId))
+    try {
+      await deleteFile(fileId)
+      await loadFiles()
+    } catch (error) {
+      console.error('Failed to delete file:', error)
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev)
+        next.delete(fileId)
+        return next
+      })
+    }
+  }
+
+  const handleReembed = async (fileId: string) => {
+    setReembeddingIds(prev => new Set(prev).add(fileId))
+    try {
+      await reembedFile(fileId)
+      await loadFiles()
+    } catch (error) {
+      console.error('Failed to reembed file:', error)
+    } finally {
+      setReembeddingIds(prev => {
         const next = new Set(prev)
         next.delete(fileId)
         return next
@@ -529,7 +601,11 @@ function FilesTab() {
               key={file.id}
               file={file}
               onRetry={handleRetry}
+              onDelete={handleDelete}
+              onReembed={handleReembed}
               retrying={retryingIds.has(file.id)}
+              deleting={deletingIds.has(file.id)}
+              reembedding={reembeddingIds.has(file.id)}
             />
           ))}
         </div>

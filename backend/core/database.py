@@ -319,6 +319,18 @@ def update_file_status(
     return update_file(file_id, **updates)
 
 
+def delete_file_record(file_id: str) -> bool:
+    """Delete a file record and its associated jobs/embeddings from the database."""
+    with get_db() as conn:
+        # Delete associated jobs
+        conn.execute("DELETE FROM jobs WHERE file_id = ?", (file_id,))
+        # Delete associated embeddings record
+        conn.execute("DELETE FROM embeddings WHERE file_id = ?", (file_id,))
+        # Delete the file record
+        result = conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+        return result.rowcount > 0
+
+
 # ============== Job Operations ==============
 
 def create_job(

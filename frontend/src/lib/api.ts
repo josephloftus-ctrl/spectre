@@ -135,6 +135,16 @@ export const retryFile = async (fileId: string): Promise<FileRecord> => {
     return data.file;
 };
 
+export const deleteFile = async (fileId: string): Promise<{ success: boolean; embeddings_deleted: number }> => {
+    const { data } = await api.delete(`/files/${fileId}`);
+    return data;
+};
+
+export const reembedFile = async (fileId: string): Promise<{ success: boolean; job_id: string }> => {
+    const { data } = await api.post(`/files/${fileId}/reembed`);
+    return data;
+};
+
 export const downloadFile = async (fileId: string): Promise<Blob> => {
     const { data } = await api.get(`/files/${fileId}/download`, {
         responseType: 'blob'
@@ -554,6 +564,22 @@ export const runPurchaseMatch = async (unit: string, includeClean: boolean = fal
 
 export const reloadPurchaseMatch = async (): Promise<PurchaseMatchStatus> => {
     const { data } = await api.post<PurchaseMatchStatus>('/purchase-match/reload');
+    return data;
+};
+
+export interface MOGSearchResult {
+    sku: string;
+    description: string;
+    vendor: string;
+    price: number | null;
+    similarity: number;
+}
+
+export const searchMOGCatalog = async (query: string, limit: number = 10): Promise<{ query: string; results: MOGSearchResult[]; count: number }> => {
+    const formData = new FormData();
+    formData.append('query', query);
+    formData.append('limit', limit.toString());
+    const { data } = await api.post('/mog/search', formData);
     return data;
 };
 

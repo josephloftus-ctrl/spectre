@@ -242,6 +242,76 @@ def retry_failed_file(file_id: str) -> Dict[str, Any]:
     return get_file(file_id)
 
 
+def delete_file(file_id: str) -> Dict[str, Any]:
+    """
+    Completely delete a file and all associated data.
+    Removes: physical files, database records, embeddings.
+    """
+    from .database import get_file, delete_file_record
+    from .embeddings import delete_file_embeddings
+
+    # Get file info first
+    file_record = get_file(file_id)
+    if not file_record:
+        raise FileNotFoundError(f"File {file_id} not found in database")
+
+    deleted_paths = []
+    errors = []
+
+    # Delete from inbox if exists
+    inbox_path = INBOX_DIR / file_id
+    if inbox_path.exists():
+        try:
+            shutil.rmtree(inbox_path)
+            deleted_paths.append(str(inbox_path))
+        except Exception as e:
+            errors.append(f"Failed to delete inbox: {e}")
+
+    # Delete from processed if exists (check all sites)
+    for site_dir in PROCESSED_DIR.iterdir():
+        if site_dir.is_dir():
+            for date_dir in site_dir.iterdir():
+                if date_dir.is_dir():
+                    # Check if this directory contains our file
+                    for f in date_dir.iterdir():
+                        if file_id in f.name or (file_record.get('filename') and file_record['filename'] in f.name):
+                            try:
+                                if f.is_file():
+                                    f.unlink()
+                                else:
+                                    shutil.rmtree(f)
+                                deleted_paths.append(str(f))
+                            except Exception as e:
+                                errors.append(f"Failed to delete {f}: {e}")
+
+    # Delete from failed if exists
+    failed_path = FAILED_DIR / file_id
+    if failed_path.exists():
+        try:
+            shutil.rmtree(failed_path)
+            deleted_paths.append(str(failed_path))
+        except Exception as e:
+            errors.append(f"Failed to delete failed dir: {e}")
+
+    # Delete embeddings from ChromaDB
+    try:
+        embedding_count = delete_file_embeddings(file_id)
+    except Exception as e:
+        embedding_count = 0
+        errors.append(f"Failed to delete embeddings: {e}")
+
+    # Delete database records
+    db_deleted = delete_file_record(file_id)
+
+    return {
+        "success": db_deleted,
+        "file_id": file_id,
+        "deleted_paths": deleted_paths,
+        "embeddings_deleted": embedding_count,
+        "errors": errors if errors else None
+    }
+
+
 def get_inbox_files() -> list:
     """Get list of files in inbox."""
     files = []

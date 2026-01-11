@@ -217,6 +217,40 @@ def retry_file(file_id: str):
         raise HTTPException(status_code=404, detail="File not found")
 
 
+@app.delete("/api/files/{file_id}")
+def delete_file_endpoint(file_id: str):
+    """Delete a file and all associated data (embeddings, jobs, physical files)."""
+    from backend.core.files import delete_file
+
+    try:
+        result = delete_file(file_id)
+        return result
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/files/{file_id}/reembed")
+def reembed_file(file_id: str):
+    """Queue a new embedding job for an existing file."""
+    from backend.core.database import get_file, create_job, JobType
+    import uuid
+
+    file_record = get_file(file_id)
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if file_record.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="File must be in completed status to re-embed")
+
+    # Create new EMBED job
+    job_id = str(uuid.uuid4())
+    create_job(job_id, JobType.EMBED, file_id, priority=1)
+
+    return {"success": True, "job_id": job_id, "message": "Embedding job queued"}
+
+
 # ============== Job Management API ==============
 
 @app.get("/api/jobs")
@@ -966,6 +1000,26 @@ def _init_purchase_match():
     except Exception as e:
         print(f"Warning: Failed to initialize purchase match: {e}")
         return False
+
+
+@app.post("/api/mog/search")
+def search_mog_catalog(
+    query: str = Form(...),
+    limit: int = Form(10)
+):
+    """Search vendor catalogs by description using semantic search."""
+    _init_purchase_match()
+
+    embedding_index = _purchase_match_state.get("mog_embedding_index")
+    if not embedding_index or not embedding_index.is_ready:
+        raise HTTPException(status_code=503, detail="Catalog search not available. MOG embedding index not ready.")
+
+    results = embedding_index.find_similar(query, limit=limit)
+    return {
+        "query": query,
+        "results": results,
+        "count": len(results)
+    }
 
 
 @app.get("/api/purchase-match/status")
