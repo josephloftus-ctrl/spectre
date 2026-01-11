@@ -1,0 +1,410 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  /* Dark theme (default) */
+  :root {
+    --background: 220 13% 12%;
+    --foreground: 60 9% 94%;
+
+    --card: 220 13% 15%;
+    --card-foreground: 60 9% 94%;
+
+    --popover: 220 13% 14%;
+    --popover-foreground: 60 9% 94%;
+
+    --primary: 207 25% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 10% 22%;
+    --secondary-foreground: 60 9% 94%;
+
+    --muted: 220 10% 20%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 207 25% 48%;
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 207 28% 60%;
+    --accent-dark: 207 32% 35%;
+
+    --destructive: 0 62.8% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Semantic colors */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 10% 24%;
+    --input: 220 10% 20%;
+    --ring: 207 25% 48%;
+
+    --radius: 0.5rem;
+
+    /* Navigation & Layout */
+    --nav-height: 56px;
+    --fab-size: 56px;
+    --touch-min: 44px;
+    --content-bottom-padding: calc(var(--nav-height) + 16px + env(safe-area-inset-bottom));
+
+    /* Spacing scale */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 48px;
+
+    /* Shadows for dark theme */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-fab: 0 4px 12px rgba(92, 124, 154, 0.3);
+  }
+
+  /* Light theme */
+  .light {
+    --background: 210 20% 98%;
+    --foreground: 220 13% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 15%;
+
+    --primary: 207 25% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 10% 94%;
+    --secondary-foreground: 220 13% 15%;
+
+    --muted: 220 10% 96%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 207 25% 48%;
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 207 28% 60%;
+    --accent-dark: 207 32% 35%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Semantic colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 10% 88%;
+    --input: 220 10% 92%;
+    --ring: 207 25% 48%;
+
+    /* Light theme shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    --shadow-fab: 0 4px 12px rgba(61, 90, 115, 0.25);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Side safe areas only - top/bottom handled by components */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Prevent overscroll bounce showing wrong color */
+    overscroll-behavior: none;
+  }
+}
+
+@keyframes progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.animate-progress {
+  animation: progress linear forwards;
+}
+
+/* Navigation animations */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fabExpand {
+  from { transform: scale(0.8) translateY(20px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes fabCollapse {
+  from { transform: scale(1) translateY(0); opacity: 1; }
+  to { transform: scale(0.8) translateY(20px); opacity: 0; }
+}
+
+@keyframes rotate45 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(45deg); }
+}
+
+@keyframes rotate0 {
+  from { transform: rotate(45deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* Utility classes for animations */
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.15s ease-in forwards;
+}
+
+.animate-fab-expand {
+  animation: fabExpand 0.2s ease-out forwards;
+}
+
+.animate-fab-collapse {
+  animation: fabCollapse 0.15s ease-in forwards;
+}
+
+/* ========== POLISH ANIMATIONS ========== */
+
+/* Skeleton loading shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius);
+}
+
+/* Pulse for live status indicators */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.pulse-live {
+  position: relative;
+}
+
+.pulse-live::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Card hover lift effect */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-hover:active {
+  transform: translateY(0);
+}
+
+/* Staggered list item animations */
+@keyframes listItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-list-item {
+  animation: listItemIn 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+/* Apply staggered delays via CSS custom property */
+.animate-list-item:nth-child(1) { animation-delay: 0ms; }
+.animate-list-item:nth-child(2) { animation-delay: 50ms; }
+.animate-list-item:nth-child(3) { animation-delay: 100ms; }
+.animate-list-item:nth-child(4) { animation-delay: 150ms; }
+.animate-list-item:nth-child(5) { animation-delay: 200ms; }
+.animate-list-item:nth-child(6) { animation-delay: 250ms; }
+.animate-list-item:nth-child(7) { animation-delay: 300ms; }
+.animate-list-item:nth-child(8) { animation-delay: 350ms; }
+
+/* Button press feedback */
+.btn-press {
+  transition: transform 0.1s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Smooth page transitions */
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-in {
+  animation: pageIn 0.4s ease-out forwards;
+}
+
+/* Scale in for modals/popovers */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus ring improvements */
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Number counter animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count {
+  animation: countUp 0.5s ease-out forwards;
+}
+
+/* Status badge pulse */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.status-pulse {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* Subtle background pulse for attention */
+@keyframes bgPulse {
+  0%, 100% { background-opacity: 1; }
+  50% { background-opacity: 0.7; }
+}
+
+/* Smooth color transitions for theme changes */
+* {
+  transition-property: background-color, border-color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
+
+/* Disable transitions on page load to prevent flash */
+.no-transitions * {
+  transition: none !important;
+}
+
+/* Loading dots animation */
+@keyframes loadingDots {
+  0%, 20% { opacity: 0; }
+  50% { opacity: 1; }
+  80%, 100% { opacity: 0; }
+}
+
+.loading-dots span {
+  animation: loadingDots 1.4s infinite;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Tooltip fade */
+.tooltip-fade {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.tooltip-fade.show {
+  opacity: 1;
+}

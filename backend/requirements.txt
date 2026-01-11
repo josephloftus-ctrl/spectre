@@ -1,0 +1,18 @@
+# Spectre Backend Dependencies
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Background Jobs
+apscheduler>=3.10.0
+
+# Vector Database
+chromadb>=0.4.0
+
+# HTTP Client (for Ollama)
+requests>=2.31.0
+
+# Utilities
+aiofiles>=23.0.0
