@@ -382,6 +382,16 @@ def get_or_generate_standup(target_date: Optional[str] = None) -> Dict[str, Any]
     result = asdict(content)
     result["from_cache"] = False
 
+    # Save to cache for future requests
+    target = target_date or date.today().isoformat()
+    cache_file = CACHE_DIR / f"standup_{target}.json"
+    try:
+        with open(cache_file, 'w') as f:
+            json.dump(result, f, indent=2)
+        logger.info(f"Cached standup for {target}")
+    except Exception as e:
+        logger.error(f"Failed to cache standup: {e}")
+
     return result
 
 
