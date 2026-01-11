@@ -8,6 +8,7 @@ Provides:
 """
 
 import json
+import os
 import requests
 from datetime import datetime
 from typing import Optional
@@ -19,7 +20,7 @@ from backend.core.database import (
 from backend.core.engine import parse_excel_file, parse_csv_file
 
 # Ollama configuration
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 ANALYSIS_MODEL = "granite4:3b"  # Use smaller model for analysis tasks
 
 # Alert thresholds for change detection
@@ -180,13 +181,13 @@ def compare_with_previous(file_id: str, site_id: str = None) -> Optional[dict]:
 
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute(f"""
+        cursor.execute("""
             SELECT id, filename, parsed_data, created_at
             FROM files
             WHERE site_id = ? AND status = ? AND id != ?
             ORDER BY created_at DESC
-            LIMIT {COMPARISON_HISTORY_LIMIT}
-        """, (site, FileStatus.COMPLETED.value, file_id))
+            LIMIT ?
+        """, (site, FileStatus.COMPLETED.value, file_id, COMPARISON_HISTORY_LIMIT))
         previous_files = cursor.fetchall()
 
     if not previous_files:

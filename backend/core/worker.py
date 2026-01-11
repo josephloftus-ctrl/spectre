@@ -497,10 +497,10 @@ def recover_stuck_jobs():
     Recover jobs stuck in 'running' state for more than 10 minutes.
     This handles cases where the server restarted while a job was processing.
     """
-    from .database import get_db_connection
+    from .database import get_db
 
     try:
-        with get_db_connection() as conn:
+        with get_db() as conn:
             # Find jobs stuck in running for more than 10 minutes
             cur = conn.execute("""
                 SELECT id, job_type, started_at, attempts

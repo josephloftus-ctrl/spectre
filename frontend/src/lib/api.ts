@@ -18,7 +18,7 @@ export interface InventorySummary {
 }
 
 export type FileStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export interface FileRecord {
     id: string;
@@ -170,6 +170,16 @@ export const fetchJob = async (jobId: string): Promise<JobRecord> => {
 
 export const retryFailedJobs = async (): Promise<{ success: boolean; requeued_count: number }> => {
     const { data } = await api.post('/jobs/retry-failed');
+    return data;
+};
+
+export const cancelJob = async (jobId: string): Promise<{ success: boolean; job: JobRecord }> => {
+    const { data } = await api.post(`/jobs/${jobId}/cancel`);
+    return data;
+};
+
+export const cancelAllJobs = async (): Promise<{ success: boolean; cancelled_count: number }> => {
+    const { data } = await api.post('/jobs/cancel-all');
     return data;
 };
 

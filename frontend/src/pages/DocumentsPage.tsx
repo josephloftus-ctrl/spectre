@@ -7,11 +7,11 @@ import {
   FileSpreadsheet, Search, RefreshCw, Loader2,
   CheckCircle2, AlertCircle, Clock, Cog,
   FolderOpen, Unplug, Radio, Book, Utensils, Brain,
-  Upload, Files, Trash2, Database, MoreVertical
+  Upload, Files, Trash2, Database, MoreVertical, StopCircle
 } from 'lucide-react'
 import { DropZone, FileCard, FileStatus as InboxFileStatus } from '@/components/inbox'
 import { useFolderPicker } from '@/hooks'
-import { uploadFile, fetchFiles, retryFile, deleteFile, reembedFile, fetchCollections, FileRecord, FileStatus, CollectionInfo } from '@/lib/api'
+import { uploadFile, fetchFiles, retryFile, deleteFile, reembedFile, fetchCollections, fetchJobs, cancelJob, cancelAllJobs, FileRecord, FileStatus, CollectionInfo, JobRecord } from '@/lib/api'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,17 +71,19 @@ interface DocumentCardProps {
   onRetry: (id: string) => void
   onDelete: (id: string) => void
   onReembed: (id: string) => void
+  onCancel: (id: string) => void
   retrying: boolean
   deleting: boolean
   reembedding: boolean
+  cancelling: boolean
 }
 
 // ============ Document Card Component ============
 
-function DocumentCard({ file, onRetry, onDelete, onReembed, retrying, deleting, reembedding }: DocumentCardProps) {
+function DocumentCard({ file, onRetry, onDelete, onReembed, onCancel, retrying, deleting, reembedding, cancelling }: DocumentCardProps) {
   const status = statusConfig[file.status]
   const StatusIcon = status.icon
-  const isLoading = retrying || deleting || reembedding
+  const isLoading = retrying || deleting || reembedding || cancelling
 
   return (
     <Card className={cn(file.status === 'failed' && 'border-destructive/50')}>
@@ -134,6 +136,12 @@ function DocumentCard({ file, onRetry, onDelete, onReembed, retrying, deleting, 
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {(file.status === 'pending' || file.status === 'processing') && (
+                    <DropdownMenuItem onClick={() => onCancel(file.id)}>
+                      <StopCircle className="h-4 w-4 mr-2" />
+                      Cancel Jobs
+                    </DropdownMenuItem>
+                  )}
                   {file.status === 'completed' && (
                     <DropdownMenuItem onClick={() => onReembed(file.id)}>
                       <Database className="h-4 w-4 mr-2" />
@@ -425,11 +433,14 @@ type FilterStatus = FileStatus | 'all'
 
 function FilesTab() {
   const [files, setFiles] = useState<FileRecord[]>([])
+  const [activeJobs, setActiveJobs] = useState<JobRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set())
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [reembeddingIds, setReembeddingIds] = useState<Set<string>>(new Set())
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set())
+  const [cancellingAll, setCancellingAll] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
 
@@ -437,8 +448,13 @@ function FilesTab() {
     try {
       setLoading(true)
       const statusFilter = filter === 'all' ? undefined : filter
-      const { files: fetchedFiles } = await fetchFiles({ status: statusFilter, limit: 200 })
+      const [{ files: fetchedFiles }, { jobs }] = await Promise.all([
+        fetchFiles({ status: statusFilter, limit: 200 }),
+        fetchJobs({ limit: 100 })
+      ])
       setFiles(fetchedFiles)
+      // Track active jobs (queued or running)
+      setActiveJobs(jobs.filter(j => j.status === 'queued' || j.status === 'running'))
     } catch (error) {
       console.error('Failed to fetch files:', error)
     } finally {
@@ -509,6 +525,39 @@ function FilesTab() {
     }
   }
 
+  const handleCancel = async (fileId: string) => {
+    setCancellingIds(prev => new Set(prev).add(fileId))
+    try {
+      // Cancel all jobs for this file
+      const jobsForFile = activeJobs.filter(j => j.file_id === fileId)
+      await Promise.all(jobsForFile.map(j => cancelJob(j.id)))
+      await loadFiles()
+    } catch (error) {
+      console.error('Failed to cancel jobs:', error)
+    } finally {
+      setCancellingIds(prev => {
+        const next = new Set(prev)
+        next.delete(fileId)
+        return next
+      })
+    }
+  }
+
+  const handleCancelAll = async () => {
+    if (!confirm(`Cancel all ${activeJobs.length} active jobs?`)) {
+      return
+    }
+    setCancellingAll(true)
+    try {
+      await cancelAllJobs()
+      await loadFiles()
+    } catch (error) {
+      console.error('Failed to cancel all jobs:', error)
+    } finally {
+      setCancellingAll(false)
+    }
+  }
+
   const filteredFiles = files.filter(f => {
     if (searchQuery) {
       return f.filename.toLowerCase().includes(searchQuery.toLowerCase())
@@ -528,6 +577,22 @@ function FilesTab() {
           {files.length} files • {statusCounts.completed || 0} processed
         </p>
         <div className="flex gap-2">
+          {activeJobs.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancelAll}
+              disabled={cancellingAll}
+              className="text-destructive hover:text-destructive"
+            >
+              {cancellingAll ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <StopCircle className="h-4 w-4 mr-2" />
+              )}
+              Cancel All ({activeJobs.length})
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -603,9 +668,11 @@ function FilesTab() {
               onRetry={handleRetry}
               onDelete={handleDelete}
               onReembed={handleReembed}
+              onCancel={handleCancel}
               retrying={retryingIds.has(file.id)}
               deleting={deletingIds.has(file.id)}
               reembedding={reembeddingIds.has(file.id)}
+              cancelling={cancellingIds.has(file.id)}
             />
           ))}
         </div>

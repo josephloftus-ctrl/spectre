@@ -25,6 +25,7 @@ class JobStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class JobType(str, Enum):
@@ -72,6 +73,11 @@ def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with get_db() as conn:
+        # Enable WAL mode for better concurrency (allows concurrent reads during writes)
+        conn.execute("PRAGMA journal_mode=WAL")
+        # Set busy timeout to 5 seconds to handle lock contention
+        conn.execute("PRAGMA busy_timeout=5000")
+
         conn.executescript("""
             -- Files table: tracks uploaded documents
             CREATE TABLE IF NOT EXISTS files (
@@ -440,6 +446,40 @@ def retry_failed_jobs(max_attempts: int = 3) -> int:
             SET status = ?
             WHERE status = ? AND attempts < ?
         """, (JobStatus.QUEUED.value, JobStatus.FAILED.value, max_attempts))
+        return result.rowcount
+
+
+def cancel_job(job_id: str) -> Optional[Dict[str, Any]]:
+    """Cancel a queued or running job."""
+    job = get_job(job_id)
+    if not job:
+        return None
+
+    # Only cancel jobs that are queued or running
+    if job["status"] not in (JobStatus.QUEUED.value, JobStatus.RUNNING.value):
+        return job  # Already completed/failed/cancelled
+
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        conn.execute("""
+            UPDATE jobs
+            SET status = ?, completed_at = ?, error_message = ?
+            WHERE id = ?
+        """, (JobStatus.CANCELLED.value, now, "Cancelled by user", job_id))
+
+    return get_job(job_id)
+
+
+def cancel_all_jobs() -> int:
+    """Cancel all queued and running jobs. Returns count cancelled."""
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        result = conn.execute("""
+            UPDATE jobs
+            SET status = ?, completed_at = ?, error_message = ?
+            WHERE status IN (?, ?)
+        """, (JobStatus.CANCELLED.value, now, "Cancelled by user",
+              JobStatus.QUEUED.value, JobStatus.RUNNING.value))
         return result.rowcount
 
 

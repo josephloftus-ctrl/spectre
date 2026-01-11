@@ -64,15 +64,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Spectre Inventory Platform", version="2.0.0", lifespan=lifespan)
 
-# CORS
-# TODO: In production, replace "*" with specific allowed origins
-# Example: allow_origins=["https://ops-dash.yourdomain.com"]
+# CORS - Use environment variable for allowed origins in production
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:8090,http://localhost:5173,http://127.0.0.1:8090"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 # Configuration
@@ -108,10 +111,19 @@ def get_inventory_summary():
     total_issues = 0
 
     for score in scores:
+        # Calculate delta_pct from score history
+        delta_pct = 0.0
+        history = get_score_history(score["site_id"], limit=2)
+        if len(history) >= 2:
+            prev_value = history[1].get("total_value", 0)
+            curr_value = history[0].get("total_value", 0)
+            if prev_value > 0:
+                delta_pct = round(((curr_value - prev_value) / prev_value) * 100, 1)
+
         site_summaries.append({
             "site": score["site_id"],
             "latest_total": score["total_value"],
-            "delta_pct": 0,  # TODO: Calculate from score history
+            "delta_pct": delta_pct,
             "issue_count": score["item_flag_count"],
             "last_updated": score["created_at"]
         })
@@ -135,10 +147,19 @@ def get_site_detail(site_id: str):
     if not score:
         raise HTTPException(status_code=404, detail="Site not found")
 
+    # Calculate delta_pct from score history
+    delta_pct = 0.0
+    history = get_score_history(site_id, limit=2)
+    if len(history) >= 2:
+        prev_value = history[1].get("total_value", 0)
+        curr_value = history[0].get("total_value", 0)
+        if prev_value > 0:
+            delta_pct = round(((curr_value - prev_value) / prev_value) * 100, 1)
+
     return {
         "site": site_id,
         "latest_total": score["total_value"],
-        "delta_pct": 0,
+        "delta_pct": delta_pct,
         "latest_date": score["created_at"],
         "total_drifts": [],
         "qty_drifts": [],
@@ -280,6 +301,26 @@ def retry_all_failed_jobs():
     """Re-queue all failed jobs that haven't exceeded max attempts."""
     count = retry_failed_jobs()
     return {"success": True, "requeued_count": count}
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job_endpoint(job_id: str):
+    """Cancel a queued or running job."""
+    from backend.core.database import cancel_job
+
+    result = cancel_job(job_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"success": True, "job": result}
+
+
+@app.post("/api/jobs/cancel-all")
+def cancel_all_jobs_endpoint():
+    """Cancel all queued and running jobs."""
+    from backend.core.database import cancel_all_jobs
+
+    count = cancel_all_jobs()
+    return {"success": True, "cancelled_count": count}
 
 
 # ============== Stats API ==============
@@ -561,7 +602,7 @@ def ai_briefing(date: Optional[str] = Query(None)):
     # Generate AI summary if Ollama is available
     try:
         import requests
-        OLLAMA_URL = "http://localhost:11434"
+        OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
         # Build prompt
         prompt_parts = [f"Today is {target_date}. Give a brief morning briefing."]
@@ -1670,7 +1711,7 @@ def helpdesk_ask(
     # Generate answer with LLM
     try:
         import requests
-        OLLAMA_URL = "http://localhost:11434"
+        OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
         prompt = f"""Based on the following training materials, answer this question:
 

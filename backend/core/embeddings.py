@@ -7,6 +7,7 @@ Supports multiple collections:
 - living_memory: Personal schedules, notes, work files
 """
 import logging
+import os
 import uuid
 import json
 from pathlib import Path
@@ -34,7 +35,7 @@ from .collections import (
 logger = logging.getLogger(__name__)
 
 # Configuration
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 EMBED_MODEL = "nomic-embed-text:v1.5"
 
 # Chunking settings

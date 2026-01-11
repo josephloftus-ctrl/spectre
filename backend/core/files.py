@@ -42,6 +42,46 @@ def generate_file_id() -> str:
     return str(uuid.uuid4())
 
 
+def normalize_site_id(site_id: Optional[str], filename: str) -> str:
+    """
+    Normalize site ID for standardized naming.
+    If site_id is not provided, try to infer from filename.
+    """
+    if site_id:
+        # Standardize: lowercase, underscores instead of spaces/hyphens
+        return site_id.lower().replace(' ', '_').replace('-', '_')
+
+    # Try to infer from common patterns in filename
+    filename_lower = filename.lower()
+    site_patterns = {
+        'pseg_nhq': ['pseg nhq', 'pseg_nhq', 'nhq'],
+        'pseg_hq': ['pseg hq', 'pseg_hq', 'headquarters'],
+        'pseg_salem': ['pseg salem', 'pseg_salem', 'salem'],
+        'pseg_hope_creek': ['hope creek', 'hope_creek', 'hopecreek'],
+        'lockheed': ['lockheed', 'lm100', 'lockheed martin 100'],
+        'lockheed_bldg_d': ['bldg d', 'bldg_d', 'building d', 'lmd'],
+    }
+
+    for site_id, patterns in site_patterns.items():
+        for pattern in patterns:
+            if pattern in filename_lower:
+                return site_id
+
+    return 'unknown'
+
+
+def generate_standard_filename(site_id: str, original_filename: str) -> str:
+    """
+    Generate a standardized filename: {SITE_ID}_{YYYY-MM-DD}.{ext}
+
+    Example: pseg_nhq_2026-01-11.xlsx
+    """
+    ext = Path(original_filename).suffix.lower()
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    normalized_site = site_id.upper().replace(' ', '_').replace('-', '_')
+    return f"{normalized_site}_{date_str}{ext}"
+
+
 def get_file_type(filename: str) -> Optional[str]:
     """Get file type from filename."""
     ext = Path(filename).suffix.lower()
@@ -75,6 +115,7 @@ def save_uploaded_file(
 ) -> Dict[str, Any]:
     """
     Save an uploaded file to the inbox.
+    Automatically renames to standard format: {SITE}_{YYYY-MM-DD}.{ext}
 
     Returns the file record from the database.
     """
@@ -89,17 +130,24 @@ def save_uploaded_file(
     file_dir = INBOX_DIR / file_id
     file_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save the file
-    file_path = file_dir / filename
+    # Normalize site_id (infer from filename if not provided)
+    normalized_site = normalize_site_id(site_id, filename)
+
+    # Generate standardized filename
+    standard_filename = generate_standard_filename(normalized_site, filename)
+
+    # Save the file with standardized name
+    file_path = file_dir / standard_filename
     with open(file_path, 'wb') as f:
         f.write(file_content)
 
-    # Save metadata
+    # Save metadata (keep both original and standard filenames)
     metadata = {
         "id": file_id,
-        "filename": filename,
+        "filename": standard_filename,
+        "original_filename": filename,
         "file_type": file_type,
-        "site_id": site_id,
+        "site_id": normalized_site,
         "content_type": content_type,
         "size": len(file_content),
         "uploaded_at": datetime.utcnow().isoformat()
@@ -108,14 +156,14 @@ def save_uploaded_file(
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
 
-    # Create database record
+    # Create database record with standardized filename
     file_record = create_file(
         file_id=file_id,
-        filename=filename,
+        filename=standard_filename,
         original_path=str(file_path),
         file_type=file_type,
         file_size=len(file_content),
-        site_id=site_id
+        site_id=normalized_site
     )
 
     # Queue a processing job
