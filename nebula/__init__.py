@@ -1,1 +1,0 @@
-# Nebula - Kitchen Operations Platform

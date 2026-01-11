@@ -52,3 +52,19 @@ htmlcov/
 # Misc
 *.bak
 *.tmp
+
+# Personal/In-Use Data (structure only in repo)
+archive/
+archive_duplicates/
+files/
+FULL MOGS/
+inbox/
+Inventory Templates/
+Invoice Purchasing Summaries/
+PSEG/
+sorted/
+Templates/
+Training/
+nebula/
+inventory_audit_report.html
+inventory_watch.log
