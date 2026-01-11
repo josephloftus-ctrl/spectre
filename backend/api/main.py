@@ -3,7 +3,8 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, List, Optional
+from datetime import datetime
 from urllib.parse import quote
 import re
 import os
@@ -1814,3 +1815,545 @@ def helpdesk_ingest_corpus():
     from backend.core.corpus import ingest_training_corpus
     result = ingest_training_corpus(clear_existing=True)
     return result
+
+
+# ============== Shopping Cart API ==============
+
+from backend.core.database import (
+    add_cart_item, get_cart_item, update_cart_item_quantity,
+    remove_cart_item, list_cart_items, get_cart_summary, clear_cart,
+    bulk_add_cart_items
+)
+
+
+class CartItemRequest(BaseModel):
+    sku: str
+    description: str
+    quantity: float = 1
+    unit_price: Optional[float] = None
+    uom: Optional[str] = None
+    vendor: Optional[str] = None
+    notes: Optional[str] = None
+    source: str = "manual"
+
+
+class CartBulkRequest(BaseModel):
+    items: List[Dict[str, Any]]
+    source: str = "bulk"
+
+
+@app.get("/api/cart/{site_id}")
+def get_cart(site_id: str):
+    """Get all items in a site's shopping cart."""
+    items = list_cart_items(site_id)
+    summary = get_cart_summary(site_id)
+    return {
+        "site_id": site_id,
+        "items": items,
+        "summary": summary
+    }
+
+
+@app.post("/api/cart/{site_id}/add")
+def add_to_cart(site_id: str, request: CartItemRequest):
+    """Add an item to the shopping cart."""
+    item = add_cart_item(
+        site_id=site_id,
+        sku=request.sku,
+        description=request.description,
+        quantity=request.quantity,
+        unit_price=request.unit_price,
+        uom=request.uom,
+        vendor=request.vendor,
+        notes=request.notes,
+        source=request.source
+    )
+    return {"success": True, "item": item}
+
+
+@app.post("/api/cart/{site_id}/bulk")
+def bulk_add_to_cart(site_id: str, request: CartBulkRequest):
+    """Add multiple items to cart at once."""
+    count = bulk_add_cart_items(site_id, request.items, request.source)
+    return {
+        "success": True,
+        "added_count": count,
+        "summary": get_cart_summary(site_id)
+    }
+
+
+@app.put("/api/cart/{site_id}/{sku}")
+def update_cart_item(
+    site_id: str,
+    sku: str,
+    quantity: float = Form(...)
+):
+    """Update quantity of a cart item."""
+    item = update_cart_item_quantity(site_id, sku, quantity)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found in cart")
+    return {"success": True, "item": item}
+
+
+@app.delete("/api/cart/{site_id}/{sku}")
+def remove_from_cart(site_id: str, sku: str):
+    """Remove an item from the cart."""
+    removed = remove_cart_item(site_id, sku)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Item not found in cart")
+    return {"success": True, "message": f"Removed {sku} from cart"}
+
+
+@app.delete("/api/cart/{site_id}")
+def clear_site_cart(site_id: str):
+    """Clear all items from a site's cart."""
+    count = clear_cart(site_id)
+    return {"success": True, "cleared_count": count}
+
+
+# ============== Count Session API ==============
+
+from backend.core.database import (
+    create_count_session, get_count_session, list_count_sessions,
+    update_count_session, add_count_item, list_count_items,
+    delete_count_session
+)
+
+
+class CountItemRequest(BaseModel):
+    sku: str
+    description: str
+    counted_qty: float
+    expected_qty: Optional[float] = None
+    unit_price: Optional[float] = None
+    uom: Optional[str] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@app.get("/api/count-sessions")
+def get_count_sessions(
+    site_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    limit: int = Query(50, le=200)
+):
+    """List count sessions with optional filters."""
+    sessions = list_count_sessions(site_id=site_id, status=status, limit=limit)
+    return {"sessions": sessions, "count": len(sessions)}
+
+
+@app.post("/api/count-sessions")
+def create_new_count_session(
+    site_id: str = Form(...),
+    name: Optional[str] = Form(None)
+):
+    """Create a new inventory count session."""
+    session = create_count_session(site_id=site_id, name=name)
+    return {"success": True, "session": session}
+
+
+@app.get("/api/count-sessions/{session_id}")
+def get_count_session_detail(session_id: str):
+    """Get count session details including items."""
+    session = get_count_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    items = list_count_items(session_id)
+    return {
+        "session": session,
+        "items": items,
+        "item_count": len(items)
+    }
+
+
+@app.put("/api/count-sessions/{session_id}")
+def update_count_session_status(
+    session_id: str,
+    status: Optional[str] = Form(None),
+    name: Optional[str] = Form(None)
+):
+    """Update count session status or name."""
+    session = update_count_session(session_id, status=status, name=name)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True, "session": session}
+
+
+@app.post("/api/count-sessions/{session_id}/items")
+def add_count_session_item(session_id: str, request: CountItemRequest):
+    """Add or update a counted item in a session."""
+    session = get_count_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    item = add_count_item(
+        session_id=session_id,
+        sku=request.sku,
+        description=request.description,
+        counted_qty=request.counted_qty,
+        expected_qty=request.expected_qty,
+        unit_price=request.unit_price,
+        uom=request.uom,
+        location=request.location,
+        notes=request.notes
+    )
+    return {"success": True, "item": item}
+
+
+@app.delete("/api/count-sessions/{session_id}")
+def delete_count_session_endpoint(session_id: str):
+    """Delete a count session and all its items."""
+    deleted = delete_count_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"success": True, "message": "Session deleted"}
+
+
+# ============== Inventory Snapshot API (Safe State Return) ==============
+
+from backend.core.database import (
+    create_inventory_snapshot, get_inventory_snapshot, list_inventory_snapshots,
+    restore_inventory_snapshot, delete_inventory_snapshot, get_latest_snapshot
+)
+
+
+@app.get("/api/inventory/snapshots/{site_id}")
+def get_site_snapshots(
+    site_id: str,
+    status: Optional[str] = Query(None),
+    limit: int = Query(20, le=100)
+):
+    """List inventory snapshots for a site (restore points)."""
+    snapshots = list_inventory_snapshots(site_id, status=status, limit=limit)
+    return {"snapshots": snapshots, "count": len(snapshots)}
+
+
+@app.get("/api/inventory/snapshots/{site_id}/latest")
+def get_latest_site_snapshot(site_id: str):
+    """Get the most recent active snapshot for restoring."""
+    snapshot = get_latest_snapshot(site_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="No active snapshot found")
+    return snapshot
+
+
+@app.get("/api/inventory/snapshot/{snapshot_id}")
+def get_snapshot_detail(snapshot_id: str):
+    """Get full snapshot details including data."""
+    snapshot = get_inventory_snapshot(snapshot_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return snapshot
+
+
+@app.post("/api/inventory/snapshot/{snapshot_id}/restore")
+def restore_snapshot(snapshot_id: str):
+    """
+    Restore inventory to a snapshot state.
+    Returns the snapshot data that should be used to regenerate the inventory export.
+    """
+    snapshot = restore_inventory_snapshot(snapshot_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return {
+        "success": True,
+        "message": "Snapshot marked for restoration",
+        "snapshot": snapshot
+    }
+
+
+@app.delete("/api/inventory/snapshot/{snapshot_id}")
+def delete_snapshot(snapshot_id: str):
+    """Delete a snapshot."""
+    deleted = delete_inventory_snapshot(snapshot_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return {"success": True, "message": "Snapshot deleted"}
+
+
+# ============== Export API ==============
+
+from backend.core.xlsx_export import (
+    export_cart_from_db, export_count_session_from_db,
+    create_ordermaestro_workbook, create_cart_workbook
+)
+
+
+@app.get("/api/export/cart/{site_id}")
+def export_cart(site_id: str):
+    """Export shopping cart as OrderMaestro-compatible XLSX."""
+    try:
+        buffer = export_cart_from_db(site_id)
+        site_name = get_site_display_name(site_id)
+        filename = f"Cart_{site_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        safe_filename = sanitize_filename(filename)
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{safe_filename}"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/export/count-session/{session_id}")
+def export_count_session(session_id: str):
+    """Export count session as OrderMaestro-compatible XLSX."""
+    try:
+        buffer = export_count_session_from_db(session_id)
+        session = get_count_session(session_id)
+        site_name = get_site_display_name(session["site_id"]) if session else "Unknown"
+        filename = f"Count_{site_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        safe_filename = sanitize_filename(filename)
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{safe_filename}"
+            }
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/export/inventory/{site_id}")
+def export_inventory(
+    site_id: str,
+    include_modifications: bool = Form(False),
+    items: Optional[str] = Form(None)  # JSON array of items
+):
+    """
+    Export inventory as OrderMaestro-compatible XLSX.
+
+    Can export from:
+    - Database (parsed files)
+    - Custom items passed in request body
+    - With or without pending modifications applied
+    """
+    import json as json_module
+    from datetime import datetime
+
+    site_name = get_site_display_name(site_id)
+
+    try:
+        if items:
+            # Custom items passed in request
+            item_list = json_module.loads(items)
+            buffer = create_ordermaestro_workbook(
+                site_name=site_name,
+                items=item_list,
+                title=f"Inventory Export - {site_name}"
+            )
+        else:
+            # Export from database
+            from backend.core.xlsx_export import export_inventory_from_db
+            buffer = export_inventory_from_db(site_id, include_modifications)
+
+        filename = f"Inventory_{site_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        safe_filename = sanitize_filename(filename)
+
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{safe_filename}\"; filename*=UTF-8''{safe_filename}"
+            }
+        )
+    except json_module.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in items parameter")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== Auto-Clean & Purchase Match Integration ==============
+
+@app.post("/api/inventory/auto-clean/{site_id}")
+def auto_clean_inventory(
+    site_id: str,
+    create_snapshot: bool = Form(True),
+    apply_typo_fixes: bool = Form(True)
+):
+    """
+    Auto-clean inventory by applying purchase match corrections.
+    Creates a snapshot first for safe state return.
+
+    - Fixes SKU typos based on IPS/MOG matches
+    - Returns cleaned inventory data ready for export
+    """
+    _init_purchase_match()
+
+    config = _purchase_match_state.get("config")
+    ips_index = _purchase_match_state.get("ips_index")
+    mog_index = _purchase_match_state.get("mog_index")
+    adapter = _purchase_match_state.get("adapter")
+
+    if not config or not ips_index or not adapter:
+        raise HTTPException(status_code=503, detail="Purchase match data not available")
+
+    inventory = adapter.get_inventory_for_unit(site_id)
+    if not inventory:
+        raise HTTPException(status_code=404, detail=f"No inventory found for unit: {site_id}")
+
+    ignored_skus = get_ignored_skus(site_id)
+
+    # Run purchase match to identify issues
+    results = match_inventory(
+        inventory, ips_index, config,
+        mog_index=mog_index,
+        ignored_skus=ignored_skus
+    )
+
+    # Build original inventory data for snapshot
+    original_items = []
+    for item in inventory:
+        original_items.append({
+            "sku": item.sku,
+            "description": item.description,
+            "quantity": float(item.quantity) if item.quantity else 0,
+            "uom": item.uom,
+            "unit_price": float(item.price) if item.price else 0,
+            "vendor": item.vendor,
+            "location": getattr(item, 'location', None)
+        })
+
+    # Create snapshot before modifications
+    snapshot = None
+    if create_snapshot:
+        snapshot = create_inventory_snapshot(
+            site_id=site_id,
+            snapshot_data=original_items,
+            name=f"Pre-clean {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        )
+
+    # Build cleaned inventory with fixes applied
+    cleaned_items = []
+    fixes_applied = []
+
+    for r in results:
+        item_data = {
+            "sku": r.inventory_item.sku,
+            "description": r.inventory_item.description,
+            "quantity": float(r.inventory_item.quantity) if r.inventory_item.quantity else 0,
+            "uom": r.inventory_item.uom,
+            "unit_price": float(r.inventory_item.price) if r.inventory_item.price else 0,
+            "vendor": r.inventory_item.vendor,
+        }
+
+        # Apply typo fixes if enabled
+        if apply_typo_fixes and r.flag == MatchFlag.LIKELY_TYPO and r.suggested_sku:
+            fixes_applied.append({
+                "original_sku": r.inventory_item.sku,
+                "corrected_sku": r.suggested_sku.sku,
+                "description": r.inventory_item.description,
+                "similarity": round(r.suggested_sku.similarity * 100)
+            })
+            item_data["sku"] = r.suggested_sku.sku
+
+        cleaned_items.append(item_data)
+
+    return {
+        "site_id": site_id,
+        "snapshot_id": snapshot["id"] if snapshot else None,
+        "original_count": len(original_items),
+        "cleaned_count": len(cleaned_items),
+        "fixes_applied": fixes_applied,
+        "cleaned_items": cleaned_items
+    }
+
+
+@app.post("/api/purchase-match/{site_id}/add-to-cart")
+def add_purchase_match_to_cart(
+    site_id: str,
+    category: str = Form(...),  # 'orderable', 'likely_typos', 'unknown'
+    apply_corrections: bool = Form(True)
+):
+    """
+    Add items from purchase match results to shopping cart.
+
+    Categories:
+    - orderable: Items found in MOG catalog but not purchased yet
+    - likely_typos: Items with SKU corrections (optionally apply fixes)
+    - unknown: Items not found in any catalog
+    """
+    _init_purchase_match()
+
+    config = _purchase_match_state.get("config")
+    ips_index = _purchase_match_state.get("ips_index")
+    mog_index = _purchase_match_state.get("mog_index")
+    adapter = _purchase_match_state.get("adapter")
+
+    if not config or not ips_index or not adapter:
+        raise HTTPException(status_code=503, detail="Purchase match data not available")
+
+    inventory = adapter.get_inventory_for_unit(site_id)
+    if not inventory:
+        raise HTTPException(status_code=404, detail=f"No inventory found for unit: {site_id}")
+
+    ignored_skus = get_ignored_skus(site_id)
+
+    results = match_inventory(
+        inventory, ips_index, config,
+        mog_index=mog_index,
+        ignored_skus=ignored_skus
+    )
+
+    # Filter by category and build cart items
+    cart_items = []
+
+    for r in results:
+        if category == "orderable" and r.flag == MatchFlag.ORDERABLE and r.mog_match:
+            cart_items.append({
+                "sku": r.inventory_item.sku,
+                "description": r.mog_match.description or r.inventory_item.description,
+                "quantity": float(r.inventory_item.quantity) if r.inventory_item.quantity else 1,
+                "unit_price": float(r.mog_match.price) if r.mog_match.price else None,
+                "uom": r.inventory_item.uom,
+                "vendor": r.mog_match.vendor,
+            })
+
+        elif category == "likely_typos" and r.flag == MatchFlag.LIKELY_TYPO and r.suggested_sku:
+            sku = r.suggested_sku.sku if apply_corrections else r.inventory_item.sku
+            cart_items.append({
+                "sku": sku,
+                "description": r.inventory_item.description,
+                "quantity": float(r.inventory_item.quantity) if r.inventory_item.quantity else 1,
+                "unit_price": float(r.suggested_sku.price) if r.suggested_sku.price else None,
+                "uom": r.inventory_item.uom,
+                "vendor": r.suggested_sku.vendor,
+                "notes": f"Corrected from {r.inventory_item.sku}" if apply_corrections else None,
+            })
+
+        elif category == "unknown" and r.flag == MatchFlag.UNKNOWN:
+            cart_items.append({
+                "sku": r.inventory_item.sku,
+                "description": r.inventory_item.description,
+                "quantity": float(r.inventory_item.quantity) if r.inventory_item.quantity else 1,
+                "unit_price": float(r.inventory_item.price) if r.inventory_item.price else None,
+                "uom": r.inventory_item.uom,
+                "vendor": r.inventory_item.vendor,
+                "notes": "Unknown item - needs review",
+            })
+
+    if not cart_items:
+        return {
+            "success": True,
+            "added_count": 0,
+            "message": f"No {category} items to add"
+        }
+
+    # Add to cart
+    count = bulk_add_cart_items(site_id, cart_items, source=f"purchase_match_{category}")
+
+    return {
+        "success": True,
+        "added_count": count,
+        "category": category,
+        "summary": get_cart_summary(site_id)
+    }

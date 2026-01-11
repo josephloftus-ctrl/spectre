@@ -189,6 +189,67 @@ def init_db():
                 UNIQUE(site_id, sku)
             );
 
+            -- Shopping cart items for ordering
+            CREATE TABLE IF NOT EXISTS cart_items (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                sku TEXT NOT NULL,
+                description TEXT,
+                quantity REAL DEFAULT 1,
+                unit_price REAL,
+                uom TEXT,  -- Unit of measure (CS, EA, LB, etc.)
+                vendor TEXT,
+                notes TEXT,
+                source TEXT,  -- 'inventory', 'catalog', 'manual'
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, sku)
+            );
+
+            -- Inventory snapshots for safe state return (auto-clean restore points)
+            CREATE TABLE IF NOT EXISTS inventory_snapshots (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                name TEXT,
+                source_file_id TEXT,  -- Original file this snapshot is from
+                snapshot_data TEXT,   -- JSON of full inventory state
+                item_count INTEGER DEFAULT 0,
+                total_value REAL DEFAULT 0,
+                status TEXT DEFAULT 'active',  -- 'active', 'restored', 'archived'
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (source_file_id) REFERENCES files(id)
+            );
+
+            -- Count sessions for inventory counting
+            CREATE TABLE IF NOT EXISTS count_sessions (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                name TEXT,
+                status TEXT DEFAULT 'active',  -- 'active', 'completed', 'exported'
+                item_count INTEGER DEFAULT 0,
+                total_value REAL DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                completed_at TEXT
+            );
+
+            -- Count session items
+            CREATE TABLE IF NOT EXISTS count_items (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                sku TEXT NOT NULL,
+                description TEXT,
+                counted_qty REAL,
+                expected_qty REAL,
+                unit_price REAL,
+                uom TEXT,
+                location TEXT,  -- Storage location / GL code
+                variance REAL,  -- counted - expected
+                notes TEXT,
+                counted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES count_sessions(id)
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
             CREATE INDEX IF NOT EXISTS idx_files_site ON files(site_id);
@@ -202,6 +263,10 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_score_history_site ON score_history(site_id);
             CREATE INDEX IF NOT EXISTS idx_score_history_date ON score_history(snapshot_date);
             CREATE INDEX IF NOT EXISTS idx_ignored_items_site ON ignored_items(site_id);
+            CREATE INDEX IF NOT EXISTS idx_cart_items_site ON cart_items(site_id);
+            CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_site ON inventory_snapshots(site_id);
+            CREATE INDEX IF NOT EXISTS idx_count_sessions_site ON count_sessions(site_id);
+            CREATE INDEX IF NOT EXISTS idx_count_items_session ON count_items(session_id);
         """)
 
     # Run migrations for existing databases
@@ -909,6 +974,425 @@ def get_ignored_skus(site_id: str) -> set:
             (site_id,)
         ).fetchall()
         return {row["sku"] for row in rows}
+
+
+# ============== Shopping Cart Operations ==============
+
+def add_cart_item(
+    site_id: str,
+    sku: str,
+    description: str,
+    quantity: float = 1,
+    unit_price: Optional[float] = None,
+    uom: Optional[str] = None,
+    vendor: Optional[str] = None,
+    notes: Optional[str] = None,
+    source: str = "manual"
+) -> Dict[str, Any]:
+    """Add or update an item in the shopping cart."""
+    import uuid
+    item_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+
+    with get_db() as conn:
+        # Use INSERT OR REPLACE to handle duplicates (unique on site_id, sku)
+        conn.execute("""
+            INSERT OR REPLACE INTO cart_items
+            (id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (item_id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, now, now))
+
+    return get_cart_item(site_id, sku)
+
+
+def get_cart_item(site_id: str, sku: str) -> Optional[Dict[str, Any]]:
+    """Get a specific cart item."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM cart_items WHERE site_id = ? AND sku = ?",
+            (site_id, sku)
+        ).fetchone()
+        if row:
+            return dict(row)
+    return None
+
+
+def update_cart_item_quantity(site_id: str, sku: str, quantity: float) -> Optional[Dict[str, Any]]:
+    """Update quantity for a cart item."""
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE cart_items SET quantity = ?, updated_at = ? WHERE site_id = ? AND sku = ?",
+            (quantity, now, site_id, sku)
+        )
+    return get_cart_item(site_id, sku)
+
+
+def remove_cart_item(site_id: str, sku: str) -> bool:
+    """Remove an item from the cart."""
+    with get_db() as conn:
+        result = conn.execute(
+            "DELETE FROM cart_items WHERE site_id = ? AND sku = ?",
+            (site_id, sku)
+        )
+        return result.rowcount > 0
+
+
+def list_cart_items(site_id: str) -> List[Dict[str, Any]]:
+    """List all items in a site's shopping cart."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM cart_items WHERE site_id = ? ORDER BY created_at DESC",
+            (site_id,)
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_cart_summary(site_id: str) -> Dict[str, Any]:
+    """Get cart summary with totals."""
+    with get_db() as conn:
+        row = conn.execute("""
+            SELECT
+                COUNT(*) as item_count,
+                SUM(quantity) as total_quantity,
+                SUM(quantity * COALESCE(unit_price, 0)) as total_value
+            FROM cart_items WHERE site_id = ?
+        """, (site_id,)).fetchone()
+
+        return {
+            "site_id": site_id,
+            "item_count": row["item_count"] or 0,
+            "total_quantity": row["total_quantity"] or 0,
+            "total_value": row["total_value"] or 0
+        }
+
+
+def clear_cart(site_id: str) -> int:
+    """Clear all items from a site's cart. Returns count of items removed."""
+    with get_db() as conn:
+        result = conn.execute("DELETE FROM cart_items WHERE site_id = ?", (site_id,))
+        return result.rowcount
+
+
+def bulk_add_cart_items(site_id: str, items: List[Dict[str, Any]], source: str = "bulk") -> int:
+    """Add multiple items to cart at once. Returns count added."""
+    import uuid
+    now = datetime.utcnow().isoformat()
+    added = 0
+
+    with get_db() as conn:
+        for item in items:
+            item_id = str(uuid.uuid4())
+            conn.execute("""
+                INSERT OR REPLACE INTO cart_items
+                (id, site_id, sku, description, quantity, unit_price, uom, vendor, notes, source, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                item_id, site_id,
+                item.get("sku", ""),
+                item.get("description", ""),
+                item.get("quantity", 1),
+                item.get("unit_price"),
+                item.get("uom"),
+                item.get("vendor"),
+                item.get("notes"),
+                source, now, now
+            ))
+            added += 1
+
+    return added
+
+
+# ============== Count Session Operations ==============
+
+def create_count_session(
+    site_id: str,
+    name: Optional[str] = None
+) -> Dict[str, Any]:
+    """Create a new inventory count session."""
+    import uuid
+    session_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+
+    if not name:
+        name = f"Count {now[:10]}"
+
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO count_sessions (id, site_id, name, status, created_at, updated_at)
+            VALUES (?, ?, ?, 'active', ?, ?)
+        """, (session_id, site_id, name, now, now))
+
+    return get_count_session(session_id)
+
+
+def get_count_session(session_id: str) -> Optional[Dict[str, Any]]:
+    """Get a count session by ID."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM count_sessions WHERE id = ?",
+            (session_id,)
+        ).fetchone()
+        if row:
+            return dict(row)
+    return None
+
+
+def list_count_sessions(
+    site_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50
+) -> List[Dict[str, Any]]:
+    """List count sessions with optional filters."""
+    query = "SELECT * FROM count_sessions WHERE 1=1"
+    params = []
+
+    if site_id:
+        query += " AND site_id = ?"
+        params.append(site_id)
+
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+
+def update_count_session(
+    session_id: str,
+    status: Optional[str] = None,
+    name: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Update a count session."""
+    now = datetime.utcnow().isoformat()
+
+    updates = ["updated_at = ?"]
+    params = [now]
+
+    if status:
+        updates.append("status = ?")
+        params.append(status)
+        if status == "completed":
+            updates.append("completed_at = ?")
+            params.append(now)
+
+    if name:
+        updates.append("name = ?")
+        params.append(name)
+
+    params.append(session_id)
+
+    with get_db() as conn:
+        conn.execute(f"UPDATE count_sessions SET {', '.join(updates)} WHERE id = ?", params)
+
+        # Update item count and total value
+        conn.execute("""
+            UPDATE count_sessions SET
+                item_count = (SELECT COUNT(*) FROM count_items WHERE session_id = ?),
+                total_value = (SELECT SUM(counted_qty * COALESCE(unit_price, 0)) FROM count_items WHERE session_id = ?)
+            WHERE id = ?
+        """, (session_id, session_id, session_id))
+
+    return get_count_session(session_id)
+
+
+def add_count_item(
+    session_id: str,
+    sku: str,
+    description: str,
+    counted_qty: float,
+    expected_qty: Optional[float] = None,
+    unit_price: Optional[float] = None,
+    uom: Optional[str] = None,
+    location: Optional[str] = None,
+    notes: Optional[str] = None
+) -> Dict[str, Any]:
+    """Add or update a counted item in a session."""
+    import uuid
+    item_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+
+    variance = None
+    if expected_qty is not None:
+        variance = counted_qty - expected_qty
+
+    with get_db() as conn:
+        # Check if item already exists in session
+        existing = conn.execute(
+            "SELECT id FROM count_items WHERE session_id = ? AND sku = ?",
+            (session_id, sku)
+        ).fetchone()
+
+        if existing:
+            # Update existing
+            conn.execute("""
+                UPDATE count_items SET
+                    description = ?, counted_qty = ?, expected_qty = ?,
+                    unit_price = ?, uom = ?, location = ?,
+                    variance = ?, notes = ?, counted_at = ?
+                WHERE session_id = ? AND sku = ?
+            """, (description, counted_qty, expected_qty, unit_price, uom,
+                  location, variance, notes, now, session_id, sku))
+        else:
+            # Insert new
+            conn.execute("""
+                INSERT INTO count_items
+                (id, session_id, sku, description, counted_qty, expected_qty,
+                 unit_price, uom, location, variance, notes, counted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (item_id, session_id, sku, description, counted_qty, expected_qty,
+                  unit_price, uom, location, variance, notes, now))
+
+    return get_count_item(session_id, sku)
+
+
+def get_count_item(session_id: str, sku: str) -> Optional[Dict[str, Any]]:
+    """Get a specific count item."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM count_items WHERE session_id = ? AND sku = ?",
+            (session_id, sku)
+        ).fetchone()
+        if row:
+            return dict(row)
+    return None
+
+
+def list_count_items(session_id: str) -> List[Dict[str, Any]]:
+    """List all items in a count session."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM count_items WHERE session_id = ? ORDER BY location, sku",
+            (session_id,)
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def delete_count_session(session_id: str) -> bool:
+    """Delete a count session and all its items."""
+    with get_db() as conn:
+        conn.execute("DELETE FROM count_items WHERE session_id = ?", (session_id,))
+        result = conn.execute("DELETE FROM count_sessions WHERE id = ?", (session_id,))
+        return result.rowcount > 0
+
+
+# ============== Inventory Snapshot Operations (Safe State Return) ==============
+
+def create_inventory_snapshot(
+    site_id: str,
+    snapshot_data: List[Dict[str, Any]],
+    name: Optional[str] = None,
+    source_file_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create a snapshot of inventory state for safe restoration.
+    Called before auto-clean operations.
+    """
+    import uuid
+    snapshot_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+
+    if not name:
+        name = f"Snapshot {now[:10]}"
+
+    # Calculate totals
+    item_count = len(snapshot_data)
+    total_value = sum(
+        (item.get("quantity", 0) * (item.get("unit_price", 0) or 0))
+        for item in snapshot_data
+    )
+
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO inventory_snapshots
+            (id, site_id, name, source_file_id, snapshot_data, item_count, total_value, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)
+        """, (snapshot_id, site_id, name, source_file_id, json.dumps(snapshot_data),
+              item_count, total_value, now))
+
+    return get_inventory_snapshot(snapshot_id)
+
+
+def get_inventory_snapshot(snapshot_id: str) -> Optional[Dict[str, Any]]:
+    """Get a snapshot by ID."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM inventory_snapshots WHERE id = ?",
+            (snapshot_id,)
+        ).fetchone()
+        if row:
+            result = dict(row)
+            result["snapshot_data"] = json.loads(result.get("snapshot_data") or "[]")
+            return result
+    return None
+
+
+def list_inventory_snapshots(
+    site_id: str,
+    status: Optional[str] = None,
+    limit: int = 20
+) -> List[Dict[str, Any]]:
+    """List inventory snapshots for a site."""
+    query = "SELECT id, site_id, name, source_file_id, item_count, total_value, status, created_at FROM inventory_snapshots WHERE site_id = ?"
+    params = [site_id]
+
+    if status:
+        query += " AND status = ?"
+        params.append(status)
+
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+
+def restore_inventory_snapshot(snapshot_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Mark a snapshot as restored (for tracking).
+    The actual restoration would apply the snapshot_data to the inventory.
+    """
+    now = datetime.utcnow().isoformat()
+
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE inventory_snapshots SET status = 'restored' WHERE id = ?",
+            (snapshot_id,)
+        )
+
+    return get_inventory_snapshot(snapshot_id)
+
+
+def delete_inventory_snapshot(snapshot_id: str) -> bool:
+    """Delete a snapshot."""
+    with get_db() as conn:
+        result = conn.execute(
+            "DELETE FROM inventory_snapshots WHERE id = ?",
+            (snapshot_id,)
+        )
+        return result.rowcount > 0
+
+
+def get_latest_snapshot(site_id: str) -> Optional[Dict[str, Any]]:
+    """Get the most recent active snapshot for a site."""
+    with get_db() as conn:
+        row = conn.execute("""
+            SELECT * FROM inventory_snapshots
+            WHERE site_id = ? AND status = 'active'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (site_id,)).fetchone()
+        if row:
+            result = dict(row)
+            result["snapshot_data"] = json.loads(result.get("snapshot_data") or "[]")
+            return result
+    return None
 
 
 # Initialize on import
