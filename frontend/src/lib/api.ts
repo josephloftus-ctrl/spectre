@@ -1204,8 +1204,8 @@ export const exportInventory = async (
     return response.data;
 };
 
-// Helper function to trigger download
-export const downloadFile = (blob: Blob, filename: string) => {
+// Helper function to trigger download of a blob
+export const saveBlobAsFile = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
