@@ -3,7 +3,6 @@ Background job worker using APScheduler.
 Processes files asynchronously and runs scheduled tasks.
 """
 import logging
-import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -11,46 +10,7 @@ from typing import Optional
 import json
 import uuid
 
-
-def extract_site_from_filename(filename: str) -> Optional[str]:
-    """
-    Extract site_id from filename.
-
-    Examples:
-        "PSEG NHQ 1_8.xlsx" -> "pseg_nhq"
-        "PSEG NHQ.xlsx" -> "pseg_nhq"
-        "Site Name 12-25.xlsx" -> "site_name"
-        "_.xlsx" -> None (can't determine)
-    """
-    if not filename:
-        return None
-
-    # Remove extension
-    name = Path(filename).stem
-
-    # Skip if it's just underscores or numbers
-    if re.match(r'^[_\s\d\(\).-]+$', name):
-        return None
-
-    # Remove date patterns (1_8, 12-25, 2024-01-08, etc.)
-    name = re.sub(r'[\s_-]*\d{1,2}[_/-]\d{1,2}([_/-]\d{2,4})?$', '', name)
-    name = re.sub(r'[\s_-]*\d{4}[_/-]\d{1,2}[_/-]\d{1,2}$', '', name)
-
-    # Remove trailing numbers and special chars
-    name = re.sub(r'[\s_-]*\d+$', '', name)
-    name = re.sub(r'[\s_-]+$', '', name)
-
-    # Clean up and normalize
-    name = name.strip()
-    if not name or len(name) < 2:
-        return None
-
-    # Convert to site_id format: lowercase, spaces to underscores
-    site_id = re.sub(r'\s+', '_', name.lower())
-    site_id = re.sub(r'[^a-z0-9_]', '', site_id)
-    site_id = re.sub(r'_+', '_', site_id).strip('_')
-
-    return site_id if site_id else None
+from .naming import extract_site_from_filename
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger

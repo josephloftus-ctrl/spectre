@@ -8,16 +8,14 @@ Provides:
 """
 
 import json
-import requests
 from datetime import datetime
 from typing import Optional
-from pathlib import Path
 
 from backend.core.database import (
     get_db, get_file, FileStatus
 )
 from backend.core.engine import parse_excel_file, parse_csv_file
-from backend.core.config import settings
+from backend.core import llm
 
 # Alert thresholds for change detection
 VALUE_CHANGE_ALERT_THRESHOLD = 20.0   # Percent change to trigger value alert
@@ -29,42 +27,12 @@ ANALYSIS_ROWS_LIMIT = 50              # Max rows to send for AI analysis
 
 def check_ollama_available() -> bool:
     """Check if Ollama is running and model is available."""
-    try:
-        resp = requests.get(f"{settings.OLLAMA_URL}/api/tags", timeout=5)
-        if resp.ok:
-            models = [m['name'] for m in resp.json().get('models', [])]
-            return any(settings.ANALYSIS_MODEL in m for m in models)
-        return False
-    except Exception:
-        return False
+    return llm.check_available()
 
 
 def generate_completion(prompt: str, system: str = None, max_tokens: int = 1000) -> Optional[str]:
     """Generate a completion using Ollama."""
-    try:
-        payload = {
-            "model": settings.ANALYSIS_MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "num_predict": max_tokens,
-                "temperature": 0.3  # Lower temp for more consistent analysis
-            }
-        }
-        if system:
-            payload["system"] = system
-
-        resp = requests.post(
-            f"{settings.OLLAMA_URL}/api/generate",
-            json=payload,
-            timeout=120
-        )
-        if resp.ok:
-            return resp.json().get('response', '')
-        return None
-    except Exception as e:
-        print(f"Ollama generation error: {e}")
-        return None
+    return llm.generate(prompt, system=system, max_tokens=max_tokens)
 
 
 def analyze_document(file_id: str) -> Optional[dict]:

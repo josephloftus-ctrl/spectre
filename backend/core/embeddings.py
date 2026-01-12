@@ -27,7 +27,7 @@ from .database import create_embedding, get_file_embeddings
 from .collections import (
     COLLECTIONS,
     DEFAULT_COLLECTION,
-    get_collection as get_named_collection,
+    get_collection,
     get_chroma_client,
     CHROMA_DIR
 )
@@ -38,16 +38,6 @@ logger = logging.getLogger(__name__)
 # Chunking settings
 MAX_CHUNK_SIZE = 500  # characters
 CHUNK_OVERLAP = 50
-
-
-def get_collection(name: str = DEFAULT_COLLECTION, force_fresh: bool = False):
-    """Get or create a document collection.
-
-    Args:
-        name: Collection name (culinart_bible, food_knowledge, living_memory)
-        force_fresh: If True, create a completely new client connection
-    """
-    return get_named_collection(name, create=True)
 
 
 def embed_text(text: str) -> Optional[List[float]]:

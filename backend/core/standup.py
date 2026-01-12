@@ -18,7 +18,7 @@ from dataclasses import dataclass, asdict
 
 from .embeddings import search
 from .corpus import KNOWLEDGE_COLLECTION
-from .config import settings
+from . import llm
 
 logger = logging.getLogger(__name__)
 
@@ -40,28 +40,7 @@ class StandupContent:
 
 def get_llm_response(prompt: str, system: str = "", temperature: float = 0.7) -> Optional[str]:
     """Get response from Ollama LLM."""
-    try:
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-
-        response = requests.post(
-            f"{settings.OLLAMA_URL}/api/chat",
-            json={
-                "model": settings.LLM_MODEL,
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": temperature}
-            },
-            timeout=120
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data.get("message", {}).get("content", "")
-    except Exception as e:
-        logger.error(f"LLM request failed: {e}")
-        return None
+    return llm.chat(prompt, system=system if system else None, temperature=temperature)
 
 
 def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:

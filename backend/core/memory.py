@@ -12,7 +12,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from dateutil import parser as date_parser
 
-from .embeddings import embed_document, search, embed_text, get_collection
+from .embeddings import embed_document, search, embed_text
+from .collections import get_collection
 from .database import create_file, update_file, list_files
 
 logger = logging.getLogger(__name__)

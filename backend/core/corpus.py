@@ -1,20 +1,26 @@
 """
 Corpus ingestion for the knowledge RAG database.
+
 Handles PDF, DOCX, PPTX, XLSX files from the Training folder.
 Separate from inventory processing pipeline.
+
+File parsing has been consolidated into parsers.py.
 """
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
-import json
 
-import pdfplumber
-from docx import Document as DocxDocument
-from pptx import Presentation
-import openpyxl
-
-from .embeddings import embed_text, chunk_text, get_collection
+# Import text extraction from consolidated parsers module
+from .parsers import (
+    extract_text,
+    extract_text_from_pdf as parse_pdf,
+    extract_text_from_docx as parse_docx,
+    extract_text_from_pptx as parse_pptx,
+    extract_text_from_excel as parse_xlsx,
+)
+from .embeddings import embed_text, chunk_text
+from .collections import get_collection
 
 logger = logging.getLogger(__name__)
 
@@ -22,97 +28,31 @@ logger = logging.getLogger(__name__)
 TRAINING_DIR = Path(__file__).parent.parent.parent / "Training"
 KNOWLEDGE_COLLECTION = "culinart_bible"
 
+# Re-export for backwards compatibility
+parse_file = extract_text
 
-def parse_pdf(file_path: Path) -> str:
-    """Extract text from PDF."""
-    text_parts = []
-    try:
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    text_parts.append(text.strip())
-    except Exception as e:
-        logger.error(f"Error parsing PDF {file_path}: {e}")
-    return "\n\n".join(text_parts)
-
-
-def parse_docx(file_path: Path) -> str:
-    """Extract text from DOCX."""
-    text_parts = []
-    try:
-        doc = DocxDocument(file_path)
-        for para in doc.paragraphs:
-            if para.text.strip():
-                text_parts.append(para.text.strip())
-        # Also get text from tables
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
-                if row_text:
-                    text_parts.append(row_text)
-    except Exception as e:
-        logger.error(f"Error parsing DOCX {file_path}: {e}")
-    return "\n\n".join(text_parts)
+__all__ = [
+    "parse_pdf",
+    "parse_docx",
+    "parse_pptx",
+    "parse_xlsx",
+    "parse_file",
+    "ingest_file",
+    "ingest_training_corpus",
+    "get_corpus_stats",
+]
 
 
-def parse_pptx(file_path: Path) -> str:
-    """Extract text from PPTX."""
-    text_parts = []
-    try:
-        prs = Presentation(file_path)
-        for slide_num, slide in enumerate(prs.slides, 1):
-            slide_text = []
-            for shape in slide.shapes:
-                if hasattr(shape, "text") and shape.text.strip():
-                    slide_text.append(shape.text.strip())
-            if slide_text:
-                text_parts.append(f"[Slide {slide_num}]\n" + "\n".join(slide_text))
-    except Exception as e:
-        logger.error(f"Error parsing PPTX {file_path}: {e}")
-    return "\n\n".join(text_parts)
-
-
-def parse_xlsx(file_path: Path) -> str:
-    """Extract text from XLSX."""
-    text_parts = []
-    try:
-        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-        for sheet_name in wb.sheetnames:
-            sheet = wb[sheet_name]
-            sheet_text = [f"[Sheet: {sheet_name}]"]
-            for row in sheet.iter_rows(values_only=True):
-                row_text = " | ".join(str(cell) for cell in row if cell is not None)
-                if row_text.strip():
-                    sheet_text.append(row_text)
-            if len(sheet_text) > 1:
-                text_parts.append("\n".join(sheet_text))
-        wb.close()
-    except Exception as e:
-        logger.error(f"Error parsing XLSX {file_path}: {e}")
-    return "\n\n".join(text_parts)
-
-
-def parse_file(file_path: Path) -> Optional[str]:
-    """Parse any supported file type and return text content."""
-    suffix = file_path.suffix.lower()
-
-    if suffix == '.pdf':
-        return parse_pdf(file_path)
-    elif suffix == '.docx':
-        return parse_docx(file_path)
-    elif suffix == '.pptx':
-        return parse_pptx(file_path)
-    elif suffix == '.xlsx':
-        return parse_xlsx(file_path)
-    else:
-        logger.warning(f"Unsupported file type: {suffix} for {file_path}")
-        return None
-
-
-def ingest_file(file_path: Path, collection_name: str = KNOWLEDGE_COLLECTION) -> Dict[str, Any]:
+def ingest_file(
+    file_path: Path,
+    collection_name: str = KNOWLEDGE_COLLECTION
+) -> Dict[str, Any]:
     """
     Ingest a single file into the knowledge RAG database.
+
+    Args:
+        file_path: Path to the file to ingest
+        collection_name: ChromaDB collection to store in
 
     Returns:
         Dict with success status and chunk count
@@ -121,8 +61,8 @@ def ingest_file(file_path: Path, collection_name: str = KNOWLEDGE_COLLECTION) ->
     if not collection:
         return {"success": False, "error": "Collection not available"}
 
-    # Parse the file
-    content = parse_file(file_path)
+    # Parse the file using consolidated parser
+    content = extract_text(file_path)
     if not content:
         return {"success": False, "error": "Could not parse file"}
 
@@ -196,8 +136,10 @@ def ingest_training_corpus(clear_existing: bool = True) -> Dict[str, Any]:
 
     # Find all supported files
     supported_extensions = {'.pdf', '.docx', '.pptx', '.xlsx'}
-    files = [f for f in TRAINING_DIR.iterdir()
-             if f.is_file() and f.suffix.lower() in supported_extensions]
+    files = [
+        f for f in TRAINING_DIR.iterdir()
+        if f.is_file() and f.suffix.lower() in supported_extensions
+    ]
 
     results = {
         "success": True,

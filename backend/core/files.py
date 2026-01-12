@@ -15,6 +15,7 @@ from .database import (
     create_file, update_file, update_file_status,
     create_job, FileStatus, JobType
 )
+from .naming import normalize_site_id, generate_standard_filename
 
 # Base data directory
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -42,44 +43,7 @@ def generate_file_id() -> str:
     return str(uuid.uuid4())
 
 
-def normalize_site_id(site_id: Optional[str], filename: str) -> str:
-    """
-    Normalize site ID for standardized naming.
-    If site_id is not provided, try to infer from filename.
-    """
-    if site_id:
-        # Standardize: lowercase, underscores instead of spaces/hyphens
-        return site_id.lower().replace(' ', '_').replace('-', '_')
-
-    # Try to infer from common patterns in filename
-    filename_lower = filename.lower()
-    site_patterns = {
-        'pseg_nhq': ['pseg nhq', 'pseg_nhq', 'nhq'],
-        'pseg_hq': ['pseg hq', 'pseg_hq', 'headquarters'],
-        'pseg_salem': ['pseg salem', 'pseg_salem', 'salem'],
-        'pseg_hope_creek': ['hope creek', 'hope_creek', 'hopecreek'],
-        'lockheed': ['lockheed', 'lm100', 'lockheed martin 100'],
-        'lockheed_bldg_d': ['bldg d', 'bldg_d', 'building d', 'lmd'],
-    }
-
-    for site_id, patterns in site_patterns.items():
-        for pattern in patterns:
-            if pattern in filename_lower:
-                return site_id
-
-    return 'unknown'
-
-
-def generate_standard_filename(site_id: str, original_filename: str) -> str:
-    """
-    Generate a standardized filename: {SITE_ID}_{YYYY-MM-DD}.{ext}
-
-    Example: pseg_nhq_2026-01-11.xlsx
-    """
-    ext = Path(original_filename).suffix.lower()
-    date_str = datetime.utcnow().strftime("%Y-%m-%d")
-    normalized_site = site_id.upper().replace(' ', '_').replace('-', '_')
-    return f"{normalized_site}_{date_str}{ext}"
+# normalize_site_id and generate_standard_filename moved to naming.py
 
 
 def get_file_type(filename: str) -> Optional[str]:
