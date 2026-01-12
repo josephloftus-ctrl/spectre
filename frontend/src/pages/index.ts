@@ -11,6 +11,7 @@ export { PurchaseMatchDetailPage } from './PurchaseMatchDetailPage'
 export { PurchaseMatchCategoryPage } from './PurchaseMatchCategoryPage'
 export { CartPage } from './CartPage'
 export { CountSessionPage } from './CountSessionPage'
+export { OffCatalogPage } from './OffCatalogPage'
 
 // Legacy exports for internal use by InventoryPage
 export { ScoresPage } from './ScoresPage'

@@ -1246,3 +1246,108 @@ export const saveBlobAsFile = (blob: Blob, filename: string) => {
     link.remove();
     window.URL.revokeObjectURL(url);
 };
+
+// ============== Off-Catalog API ==============
+
+export interface OffCatalogItem {
+    id: string;
+    site_id: string;
+    dist_num: string;
+    cust_num: string;
+    description: string;
+    pack: string;
+    uom: string;
+    break_uom?: string;
+    unit_price?: number;
+    break_price?: number;
+    distributor: string;
+    distribution_center?: string;
+    brand?: string;
+    manufacturer?: string;
+    manufacturer_num?: string;
+    gtin?: string;
+    upc?: string;
+    catch_weight?: number;
+    average_weight?: number;
+    units_per_case?: number;
+    location?: string;
+    area?: string;
+    place?: string;
+    notes?: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface OffCatalogItemRequest {
+    dist_num: string;
+    cust_num?: string;
+    description?: string;
+    pack?: string;
+    uom?: string;
+    break_uom?: string;
+    unit_price?: number;
+    break_price?: number;
+    distributor?: string;
+    distribution_center?: string;
+    brand?: string;
+    manufacturer?: string;
+    manufacturer_num?: string;
+    gtin?: string;
+    upc?: string;
+    catch_weight?: number;
+    average_weight?: number;
+    units_per_case?: number;
+    location?: string;
+    area?: string;
+    place?: string;
+    notes?: string;
+}
+
+export const fetchOffCatalogItems = async (
+    siteId: string,
+    includeInactive: boolean = false
+): Promise<{ items: OffCatalogItem[]; count: number }> => {
+    const { data } = await api.get(`/off-catalog/${siteId}`, {
+        params: { include_inactive: includeInactive }
+    });
+    return data;
+};
+
+export const createOffCatalogItem = async (
+    siteId: string,
+    item: OffCatalogItemRequest
+): Promise<{ success: boolean; item: OffCatalogItem }> => {
+    const { data } = await api.post(`/off-catalog/${siteId}`, item);
+    return data;
+};
+
+export const updateOffCatalogItem = async (
+    siteId: string,
+    custNum: string,
+    item: OffCatalogItemRequest
+): Promise<{ success: boolean; item: OffCatalogItem }> => {
+    const { data } = await api.put(`/off-catalog/${siteId}/${custNum}`, item);
+    return data;
+};
+
+export const deleteOffCatalogItem = async (
+    siteId: string,
+    custNum: string,
+    hardDelete: boolean = false
+): Promise<{ success: boolean; message: string }> => {
+    const { data } = await api.delete(`/off-catalog/${siteId}/${custNum}`, {
+        params: { hard_delete: hardDelete }
+    });
+    return data;
+};
+
+export const generateCustNum = async (
+    siteId: string,
+    prefix: string = 'SPEC'
+): Promise<{ cust_num: string }> => {
+    const { data } = await api.post(`/off-catalog/${siteId}/generate-cust-num`, null, {
+        params: { prefix }
+    });
+    return data;
+};
