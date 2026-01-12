@@ -100,7 +100,7 @@ def init_db():
                 file_type TEXT,
                 file_size INTEGER,
                 site_id TEXT,
-                collection TEXT DEFAULT 'culinart_bible',
+                collection TEXT DEFAULT 'knowledge_base',
                 status TEXT DEFAULT 'pending',
                 error_message TEXT,
                 parsed_data TEXT,  -- JSON blob of extracted data
@@ -134,7 +134,7 @@ def init_db():
                 chunk_index INTEGER,
                 chunk_text TEXT,
                 metadata TEXT,  -- JSON blob
-                collection TEXT DEFAULT 'culinart_bible',
+                collection TEXT DEFAULT 'knowledge_base',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (file_id) REFERENCES files(id)
             );
@@ -357,11 +357,11 @@ def migrate_db():
         columns = [row[1] for row in cursor.fetchall()]
 
         if 'collection' not in columns:
-            conn.execute("ALTER TABLE files ADD COLUMN collection TEXT DEFAULT 'culinart_bible'")
+            conn.execute("ALTER TABLE files ADD COLUMN collection TEXT DEFAULT 'knowledge_base'")
 
         # Check if collection column exists in embeddings table
         cursor = conn.execute("PRAGMA table_info(embeddings)")
         columns = [row[1] for row in cursor.fetchall()]
 
         if 'collection' not in columns:
-            conn.execute("ALTER TABLE embeddings ADD COLUMN collection TEXT DEFAULT 'culinart_bible'")
+            conn.execute("ALTER TABLE embeddings ADD COLUMN collection TEXT DEFAULT 'knowledge_base'")

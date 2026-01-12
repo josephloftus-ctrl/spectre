@@ -68,7 +68,7 @@ def unified_search(
 ):
     """
     Search across multiple collections.
-    - collections: comma-separated list (e.g., "culinart_bible,living_memory") or empty for all
+    - collections: comma-separated list (e.g., "knowledge_base,living_memory") or empty for all
     """
     collection_list = None
     if collections:

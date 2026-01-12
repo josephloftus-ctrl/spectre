@@ -23,7 +23,7 @@ def helpdesk_ask(
     results = rag_search(
         query=question,
         limit=5,
-        collection_name="culinart_bible"
+        collection_name="knowledge_base"
     )
 
     if not results:
@@ -110,7 +110,7 @@ def helpdesk_search(
     results = rag_search(
         query=query,
         limit=limit,
-        collection_name="culinart_bible"
+        collection_name="knowledge_base"
     )
 
     formatted = []

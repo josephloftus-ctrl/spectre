@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.core.collections import (
     COLLECTIONS, list_collections, get_collection_stats,
-    migrate_spectre_to_bible, ensure_data_directories
+    migrate_spectre_to_knowledge_base, ensure_data_directories
 )
 
 router = APIRouter(prefix="/api/collections", tags=["Collections"])
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/collections", tags=["Collections"])
 def get_collections():
     """
     List all available collections with their stats.
-    Collections: culinart_bible, food_knowledge, living_memory
+    Collections: knowledge_base, food_knowledge, living_memory
     """
     collections = list_collections()
     return {"collections": collections, "count": len(collections)}
@@ -33,10 +33,10 @@ def get_collection_details(name: str):
 @router.post("/migrate")
 def migrate_collections():
     """
-    Migrate existing spectre_documents to culinart_bible.
+    Migrate existing spectre_documents to knowledge_base.
     Run this once to rename the old collection.
     """
-    result = migrate_spectre_to_bible()
+    result = migrate_spectre_to_knowledge_base()
     if not result.get("success"):
         raise HTTPException(status_code=500, detail=result.get("error", "Migration failed"))
     return result

@@ -17,7 +17,7 @@ def create_embedding(
     chunk_index: int,
     chunk_text: str,
     metadata: Optional[Dict] = None,
-    collection: str = "culinart_bible"
+    collection: str = "knowledge_base"
 ) -> Dict[str, Any]:
     """Create or update an embedding record."""
     now = datetime.utcnow().isoformat()

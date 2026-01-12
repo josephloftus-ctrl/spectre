@@ -18,19 +18,19 @@ import { cn } from '@/lib/utils'
 // ============ Shared Constants ============
 
 const COLLECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  culinart_bible: Book,
+  knowledge_base: Book,
   food_knowledge: Utensils,
   living_memory: Brain,
 }
 
 const COLLECTION_COLORS: Record<string, string> = {
-  culinart_bible: 'text-amber-500 bg-amber-100 dark:bg-amber-900/30',
+  knowledge_base: 'text-amber-500 bg-amber-100 dark:bg-amber-900/30',
   food_knowledge: 'text-green-500 bg-green-100 dark:bg-green-900/30',
   living_memory: 'text-purple-500 bg-purple-100 dark:bg-purple-900/30',
 }
 
 const COLLECTION_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  culinart_bible: {
+  knowledge_base: {
     bg: 'bg-amber-50 dark:bg-amber-900/20',
     text: 'text-amber-600 dark:text-amber-400',
     border: 'border-amber-200 dark:border-amber-800'
@@ -48,7 +48,7 @@ const COLLECTION_STYLES: Record<string, { bg: string; text: string; border: stri
 }
 
 const COLLECTION_DESCRIPTIONS: Record<string, string> = {
-  culinart_bible: 'Your company knowledge base - SOPs, training materials, inventory docs. Rarely changes.',
+  knowledge_base: 'Your company knowledge base - SOPs, training materials, inventory docs. Rarely changes.',
   food_knowledge: 'Expandable reference library - recipes, food science, vendor info. Grows over time.',
   living_memory: 'Personal work files - schedules, notes, drafts. Changes frequently.',
 }

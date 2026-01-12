@@ -2,7 +2,7 @@
 Embedding pipeline using Ollama (qwen3-embedding) and ChromaDB.
 
 Supports multiple collections:
-- culinart_bible: Static SOPs, inventory, company knowledge
+- knowledge_base: Static SOPs, inventory, company knowledge
 - food_knowledge: Expandable recipes, food science, reference
 - living_memory: Personal schedules, notes, work files
 """
@@ -137,7 +137,7 @@ def embed_document(
         site_id: Optional site identifier
         filename: Original filename
         file_date: Date string (ISO format) for the file, defaults to now
-        collection_name: Target collection (culinart_bible, food_knowledge, living_memory)
+        collection_name: Target collection (knowledge_base, food_knowledge, living_memory)
 
     Returns:
         Result dict with chunk count and status
@@ -245,7 +245,7 @@ def search(
         date_to: Optional end date (ISO format YYYY-MM-DD)
         sort_by: 'relevance' (default), 'date_desc', 'date_asc', or 'site'
         site_id: Optional site ID to filter results
-        collection_name: Collection to search (culinart_bible, food_knowledge, living_memory)
+        collection_name: Collection to search (knowledge_base, food_knowledge, living_memory)
 
     Returns:
         List of matching chunks with scores, sorted as requested

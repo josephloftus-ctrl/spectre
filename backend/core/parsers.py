@@ -590,8 +590,8 @@ def extract_site_from_excel(
     Extract site name from Excel file header rows.
 
     Looks for patterns like:
-        "PSEG - NHQ (673) (COMPASS)" -> "pseg_nhq"
-        "Lockhead Martin, Bldg 100 (COMPASS)" -> "lockhead_martin_bldg_100"
+        "Site Name - Location (123) (VENDOR)" -> "site_name_location"
+        "Building Name, Floor 100 (VENDOR)" -> "building_name_floor_100"
 
     Args:
         file_path: Path to Excel file

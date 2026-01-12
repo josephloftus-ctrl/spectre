@@ -13,13 +13,13 @@ import {
 import { cn } from '@/lib/utils'
 
 const COLLECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  culinart_bible: Book,
+  knowledge_base: Book,
   food_knowledge: Utensils,
   living_memory: Brain,
 }
 
 const COLLECTION_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  culinart_bible: {
+  knowledge_base: {
     bg: 'bg-amber-50 dark:bg-amber-900/20',
     text: 'text-amber-600 dark:text-amber-400',
     border: 'border-amber-200 dark:border-amber-800'
@@ -37,7 +37,7 @@ const COLLECTION_COLORS: Record<string, { bg: string; text: string; border: stri
 }
 
 const COLLECTION_DESCRIPTIONS: Record<string, string> = {
-  culinart_bible: 'Your company knowledge base - SOPs, training materials, inventory docs. Rarely changes.',
+  knowledge_base: 'Your company knowledge base - SOPs, training materials, inventory docs. Rarely changes.',
   food_knowledge: 'Expandable reference library - recipes, food science, vendor info. Grows over time.',
   living_memory: 'Personal work files - schedules, notes, drafts. Changes frequently.',
 }
@@ -267,7 +267,7 @@ export function CollectionsPage() {
               ) : (
                 <ArrowRight className="h-4 w-4 mr-2" />
               )}
-              Migrate spectre_documents → culinart_bible
+              Migrate spectre_documents → knowledge_base
             </Button>
 
             <Button
@@ -321,7 +321,7 @@ export function CollectionsPage() {
           <div className="flex items-start gap-3">
             <Book className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-medium text-foreground">Culinart Bible</span> - Upload your SOPs, training docs, and company reference materials. These are your "golden" documents that rarely change.
+              <span className="font-medium text-foreground">Knowledge Base</span> - Upload your SOPs, training docs, and company reference materials. These are your "golden" documents that rarely change.
             </div>
           </div>
           <div className="flex items-start gap-3">

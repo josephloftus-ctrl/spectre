@@ -2,7 +2,7 @@
 Multi-collection management for RAG system.
 
 Collections:
-- culinart_bible: Static SOPs, inventory, company knowledge
+- knowledge_base: Static SOPs, inventory, company knowledge
 - food_knowledge: Expandable recipes, food science, reference
 - living_memory: Personal schedules, notes, work files
 """
@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 # Collection definitions
 COLLECTIONS = {
-    "culinart_bible": {
-        "description": "Culinart SOPs, training materials, and company knowledge",
+    "knowledge_base": {
+        "description": "SOPs, training materials, and company knowledge",
         "icon": "book",
         "color": "amber",
         "type": "static",  # Rarely changes, company reference
@@ -50,7 +50,7 @@ COLLECTIONS = {
 }
 
 # Default collection for backwards compatibility
-DEFAULT_COLLECTION = "culinart_bible"
+DEFAULT_COLLECTION = "knowledge_base"
 
 # ChromaDB persistence directory
 CHROMA_DIR = Path(__file__).resolve().parents[2] / "data" / "embeddings" / "chroma"
@@ -229,9 +229,9 @@ def ensure_data_directories():
     logger.info(f"Ensured data directories at {DATA_DIR}")
 
 
-def migrate_spectre_to_bible() -> Dict[str, Any]:
+def migrate_spectre_to_knowledge_base() -> Dict[str, Any]:
     """
-    Migrate existing spectre_documents collection to culinart_bible.
+    Migrate existing spectre_documents collection to knowledge_base.
 
     This creates a new collection with the same data and then
     optionally deletes the old one.
@@ -266,8 +266,8 @@ def migrate_spectre_to_bible() -> Dict[str, Any]:
 
     # Get or create the new collection
     new_collection = client.get_or_create_collection(
-        name="culinart_bible",
-        metadata={"description": COLLECTIONS["culinart_bible"]["description"]}
+        name="knowledge_base",
+        metadata={"description": COLLECTIONS["knowledge_base"]["description"]}
     )
 
     # Check if already migrated
@@ -275,7 +275,7 @@ def migrate_spectre_to_bible() -> Dict[str, Any]:
     if new_count >= old_count:
         return {
             "success": True,
-            "message": f"culinart_bible already has {new_count} chunks (old had {old_count})",
+            "message": f"knowledge_base already has {new_count} chunks (old had {old_count})",
             "migrated": 0,
             "already_migrated": True
         }
@@ -314,7 +314,7 @@ def migrate_spectre_to_bible() -> Dict[str, Any]:
 
     return {
         "success": True,
-        "message": f"Migrated {migrated} chunks from spectre_documents to culinart_bible",
+        "message": f"Migrated {migrated} chunks from spectre_documents to knowledge_base",
         "migrated": migrated,
         "old_count": old_count,
         "new_count": final_count

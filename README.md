@@ -20,7 +20,7 @@ Spectre is a modern inventory operations dashboard that combines document manage
 
 ### Semantic Search
 - **Natural Language Queries** - Ask questions like "What items had the highest value drift?"
-- **Collection Filtering** - Search across culinart bible, food knowledge, or living memory
+- **Collection Filtering** - Search across knowledge base, food knowledge, or living memory
 - **Date Range Filtering** - Find documents from specific time periods
 
 ### Inventory Analytics

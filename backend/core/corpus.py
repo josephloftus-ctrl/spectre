@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Training corpus location
 TRAINING_DIR = Path(__file__).parent.parent.parent / "Training"
-KNOWLEDGE_COLLECTION = "culinart_bible"
+KNOWLEDGE_COLLECTION = "knowledge_base"
 
 # Re-export for backwards compatibility
 parse_file = extract_text

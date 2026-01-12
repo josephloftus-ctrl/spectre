@@ -2,14 +2,14 @@
 
 ## Context
 
-Joseph is Area Support Chef for CulinArt (Compass Group B&I). He's been tasked by his District Manager Ken to review inventory valuations across multiple units weekly. The Ops-dash already exists and can:
+A multi-unit inventory manager needs to review inventory valuations across multiple units weekly. The Ops-dash already exists and can:
 
 - Watch a folder for incoming OrderMaestro valuation exports
 - Ingest and parse xlsx files
 - Display inventory data
 - Compare valuations across time
 
-What's missing is a **unit health scoring system** that lets Joseph see at a glance which units have problems and which are clean—sorted from worst to best.
+What's missing is a **unit health scoring system** that lets managers see at a glance which units have problems and which are clean—sorted from worst to best.
 
 ---
 
@@ -67,7 +67,7 @@ Unit Score = Σ(item flag points) + Σ(room flag points)
 
 ### Example
 
-**Unit A - PSEG NHQ**
+**Unit A - Site NHQ**
 
 Item flags:
 - CELIUS: 22 CS, $564.96 → 10+ CS (3) + >$250 (1) = 4 pts
@@ -90,16 +90,16 @@ Show all units sorted by score, descending (worst first):
 ```
 UNIT                    SCORE    FLAGS
 -----------------------------------------
-Phoenix Contact         14       5 items, 1 room
-PSEG Salem              10       4 items, 0 rooms
-Lockheed Bldg 100        6       2 items, 1 room
-P&G Greensboro           2       0 items, 1 room
-PSEG Hope Creek          0       Clean
+Site Phoenix            14       5 items, 1 room
+Site Salem              10       4 items, 0 rooms
+Site Bldg 100            6       2 items, 1 room
+Site Greensboro          2       0 items, 1 room
+Site Hope Creek          0       Clean
 ```
 
 ### Unit Detail View (click to expand or separate view)
 
-When Joseph drills into a unit, show:
+When a manager drills into a unit, show:
 
 1. **Flagged Items** (sorted by points descending)
    - Item description
@@ -196,13 +196,13 @@ Recommend backend so scores persist and can be compared over time.
 
 ---
 
-## Joseph's Sites (for reference)
+## Example Sites (for reference)
 
-- PSEG NHQ
-- PSEG Hope Creek
-- PSEG Salem
-- Lockheed Martin Building 100
-- Lockheed Martin Building D
-- P&G Greensboro
-- Phoenix Contact
-- CSC HQ
+- Site NHQ
+- Site Hope Creek
+- Site Salem
+- Site Building 100
+- Site Building D
+- Site Greensboro
+- Site Phoenix
+- Site HQ

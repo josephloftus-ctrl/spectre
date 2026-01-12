@@ -15,7 +15,7 @@ def create_file(
     file_type: str,
     file_size: int,
     site_id: Optional[str] = None,
-    collection: str = "culinart_bible"
+    collection: str = "knowledge_base"
 ) -> Dict[str, Any]:
     """Create a new file record."""
     now = datetime.utcnow().isoformat()

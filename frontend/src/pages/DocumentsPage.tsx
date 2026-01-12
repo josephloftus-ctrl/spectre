@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 // ============ Shared Constants ============
 
 const COLLECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  culinart_bible: Book,
+  knowledge_base: Book,
   food_knowledge: Utensils,
   living_memory: Brain,
 }
@@ -170,7 +170,7 @@ function DocumentCard({ file, onRetry, onDelete, onReembed, onCancel, retrying, 
 function UploadTab() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [collections, setCollections] = useState<CollectionInfo[]>([])
-  const [selectedCollection, setSelectedCollection] = useState('culinart_bible')
+  const [selectedCollection, setSelectedCollection] = useState('knowledge_base')
 
   useEffect(() => {
     fetchCollections()

@@ -8,7 +8,7 @@ import { uploadFile, fetchCollections, CollectionInfo } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 const COLLECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  culinart_bible: Book,
+  knowledge_base: Book,
   food_knowledge: Utensils,
   living_memory: Brain,
 }
@@ -32,7 +32,7 @@ function getFileType(filename: string): 'xlsx' | 'xls' | 'pdf' | 'csv' {
 export function InboxPage() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [collections, setCollections] = useState<CollectionInfo[]>([])
-  const [selectedCollection, setSelectedCollection] = useState('culinart_bible')
+  const [selectedCollection, setSelectedCollection] = useState('knowledge_base')
 
   useEffect(() => {
     fetchCollections()
