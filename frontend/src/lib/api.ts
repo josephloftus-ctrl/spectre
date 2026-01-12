@@ -8,6 +8,10 @@ export interface SiteSummary {
     delta_pct: number;
     issue_count: number;
     last_updated: string;
+    // Health scoring fields
+    health_score?: number;
+    health_status?: 'critical' | 'warning' | 'healthy' | 'clean';
+    room_flag_count?: number;
 }
 
 export interface InventorySummary {
@@ -1058,6 +1062,33 @@ export const deleteCountSession = async (
     sessionId: string
 ): Promise<{ success: boolean; message: string }> => {
     const { data } = await api.delete(`/count-sessions/${sessionId}`);
+    return data;
+};
+
+export const populateCountFromInventory = async (
+    sessionId: string
+): Promise<{ success: boolean; added_count: number; session: CountSession; items: CountItem[] }> => {
+    const { data } = await api.post(`/count-sessions/${sessionId}/populate-from-inventory`);
+    return data;
+};
+
+// ============== Inventory Items API (from valuation files) ==============
+
+export interface InventoryItemsResponse {
+    items: InventoryItem[];
+    count: number;
+    total_in_file: number;
+    source_file: string;
+    file_date: string;
+}
+
+export const fetchInventoryItems = async (
+    siteId: string,
+    limit?: number
+): Promise<InventoryItemsResponse> => {
+    const { data } = await api.get(`/inventory/sites/${siteId}/items`, {
+        params: { limit }
+    });
     return data;
 };
 

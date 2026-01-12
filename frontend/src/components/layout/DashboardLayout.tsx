@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { usePageTitle } from "./Sidebar"
 import { useNotes, useTheme } from "@/hooks"
 import { Button } from "@/components/ui/button"
 import { Sun, Moon } from "lucide-react"
 import { BottomTabBar, BottomSheet, FAB } from "@/components/navigation"
+import { QuickCapture } from "@/components/notes/QuickCapture"
 
 interface DashboardLayoutProps {
     children: React.ReactNode
@@ -11,14 +13,23 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
     const pageTitle = usePageTitle()
+    const navigate = useNavigate()
     const { create } = useNotes()
     const { theme, toggleTheme } = useTheme()
     const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false)
+    const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false)
 
-    const handleAddNote = async () => {
-        // Navigate to notes or open a modal
-        // For now, create a quick note
-        await create('New note', { isVoiceNote: false })
+    const handleAddNote = () => {
+        setIsQuickCaptureOpen(true)
+    }
+
+    const handleQuickCaptureSubmit = async (content: string, isVoiceNote?: boolean) => {
+        await create(content, { isVoiceNote: isVoiceNote || false })
+        setIsQuickCaptureOpen(false)
+    }
+
+    const handleQuickCount = () => {
+        navigate('/count')
     }
 
     return (
@@ -80,7 +91,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             />
 
             {/* Floating Action Button */}
-            <FAB onAddNote={handleAddNote} />
+            <FAB onAddNote={handleAddNote} onQuickCount={handleQuickCount} />
+
+            {/* Quick Capture Modal for Notes */}
+            {isQuickCaptureOpen && (
+                <QuickCapture
+                    onSubmit={handleQuickCaptureSubmit}
+                    onClose={() => setIsQuickCaptureOpen(false)}
+                />
+            )}
         </div>
     )
 }

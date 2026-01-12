@@ -1,15 +1,23 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, fetchSiteScore, fetchSite, updateSiteName, formatSiteName, FlaggedItem, fetchSiteFiles } from '@/lib/api'
+import { api, fetchSiteScore, fetchSite, updateSiteName, formatSiteName, FlaggedItem, fetchSiteFiles, exportInventory, exportCart, saveBlobAsFile } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, TrendingUp, TrendingDown, AlertTriangle, Package, DollarSign, Calendar, Loader2, MapPin, Pencil, Check, X, FileText } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, AlertTriangle, Package, DollarSign, Calendar, Loader2, MapPin, Pencil, Check, X, FileText, Download, ShoppingCart } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { StatusIndicator, getStatusLabel, getTrendIcon, getTrendColor } from '@/components/ui/status-indicator'
 import { FlagBadgeList, FlagType } from '@/components/flags/FlagBadge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface SiteDetail {
   site: string
@@ -44,6 +52,9 @@ export function SitePage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  // Export state
+  const [isExporting, setIsExporting] = useState(false)
 
   const { data: site, isLoading, error } = useQuery({
     queryKey: ['site', siteId],
@@ -104,6 +115,26 @@ export function SitePage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleExportInventory = async () => {
+    if (!siteId) return
+    setIsExporting(true)
+    try {
+      const blob = await exportInventory(siteId)
+      const today = new Date().toISOString().split('T')[0]
+      saveBlobAsFile(blob, `inventory_${siteId}_${today}.xlsx`)
+    } catch (err) {
+      console.error('Failed to export inventory:', err)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportCart = () => {
+    if (!siteId) return
+    // exportCart returns a direct URL for download
+    window.location.href = exportCart(siteId)
   }
 
   if (isLoading) {
@@ -208,17 +239,43 @@ export function SitePage() {
             </div>
           </div>
         </div>
-        {scoreData && scoreData.item_flags > 0 && (
-          <div className="text-sm text-muted-foreground">
-            {scoreData.item_flags} item flag{scoreData.item_flags !== 1 ? 's' : ''}
-          </div>
-        )}
-        {!scoreData && totalIssues > 0 && (
-          <Badge variant="destructive" className="text-sm">
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            {totalIssues} Active {totalIssues === 1 ? 'Issue' : 'Issues'}
-          </Badge>
-        )}
+        <div className="flex items-center gap-3">
+          {scoreData && scoreData.item_flags > 0 && (
+            <div className="text-sm text-muted-foreground">
+              {scoreData.item_flags} item flag{scoreData.item_flags !== 1 ? 's' : ''}
+            </div>
+          )}
+          {!scoreData && totalIssues > 0 && (
+            <Badge variant="destructive" className="text-sm">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {totalIssues} Active {totalIssues === 1 ? 'Issue' : 'Issues'}
+            </Badge>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleExportInventory}>
+                <Package className="h-4 w-4 mr-2" />
+                Export Inventory
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCart}>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Export Cart
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* Key Metrics */}

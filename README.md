@@ -24,9 +24,16 @@ Spectre is a modern inventory operations dashboard that combines document manage
 - **Date Range Filtering** - Find documents from specific time periods
 
 ### Inventory Analytics
-- **Site Health Matrix** - At-a-glance status across all locations
+- **Site Health Scoring** - Comprehensive health scores combining item and room-level flags
+- **Purchase Match Integration** - SKU validation against vendor catalogs with typo detection
+- **Room-Level Metrics** - Track inventory by location (walk-in, freezer, dry storage)
 - **Drift Detection** - Automatic anomaly detection with risk scoring
 - **Trend Analysis** - Historical comparison and forecasting
+
+### Quick Actions (FAB)
+- **Quick Note** - Inline note capture with voice recording support
+- **Count Session** - Start inventory counts quickly
+- **Shopping Cart** - Quick access to order building
 
 ---
 
@@ -121,15 +128,25 @@ spectre/
 │   │   └── pages/          # Route pages
 │   └── dist/               # Built assets
 ├── backend/
-│   ├── api/main.py         # FastAPI routes
+│   ├── api/
+│   │   ├── main.py         # FastAPI app setup
+│   │   ├── models.py       # Pydantic request/response models
+│   │   └── routers/        # Modular API routers
+│   │       ├── inventory.py
+│   │       ├── scores.py
+│   │       ├── files.py
+│   │       ├── search.py
+│   │       └── ...
 │   └── core/               # Business logic
+│       ├── database.py     # SQLite operations
+│       ├── worker.py       # Background job processor
+│       ├── flag_checker.py # Health scoring system
 │       ├── engine.py       # Excel parsing
 │       ├── embeddings.py   # Vector embeddings
-│       ├── analysis.py     # AI analysis
-│       └── standup.py      # Daily standup generation
+│       └── analysis.py     # AI analysis
 ├── data/                   # Runtime data
 │   ├── inbox/              # Uploaded files
-│   ├── processed/          # Parsed files
+│   ├── processed/          # Parsed files by site
 │   ├── embeddings/         # ChromaDB persistence
 │   └── spectre.db          # SQLite database
 └── nginx/                  # Nginx configuration
@@ -141,17 +158,31 @@ spectre/
 
 | Route | Description |
 |-------|-------------|
-| `/` | Dashboard with KPIs, site carousel, health matrix |
-| `/inventory` | Tabbed view: Health, History, Purchase Match |
-| `/documents` | File upload and processing status |
+| `/` | Dashboard with site health scores, sorted by urgency |
+| `/site/:id` | Site detail with room breakdown, flagged items |
+| `/inbox` | File upload and processing status |
+| `/documents` | Document list and management |
 | `/assistant` | AI chat, daily standup, help desk |
-| `/search` | Semantic search and collection management |
+| `/search` | Semantic search across all collections |
+| `/purchase-match` | SKU validation and catalog matching |
+| `/cart` | Shopping cart for order building |
+| `/count` | Inventory count sessions |
 | `/notes` | Note taking with voice recording |
 | `/settings` | System configuration and status |
 
 ---
 
 ## API Endpoints
+
+### Inventory
+- `GET /api/inventory/summary` - Global stats with site health scores
+- `GET /api/inventory/sites/{id}` - Site detail with room breakdown
+- `GET /api/inventory/sites/{id}/items` - Normalized inventory items
+
+### Scores
+- `GET /api/scores` - List all unit scores
+- `GET /api/scores/{site_id}` - Site health score detail
+- `POST /api/scores/refresh` - Re-score all sites
 
 ### Files
 - `POST /api/files/upload` - Upload a file
@@ -160,11 +191,14 @@ spectre/
 
 ### Search
 - `POST /api/search/unified` - Search across all collections
-- `POST /api/search/collection/{name}` - Search specific collection
+- `POST /api/search/{collection}` - Search specific collection
+
+### Purchase Match
+- `GET /api/purchase-match/status` - System status
+- `GET /api/purchase-match/run/{unit}` - Run SKU validation
 
 ### AI
 - `GET /api/standup` - Get daily standup content
-- `POST /api/standup/reroll/{section}` - Regenerate a section
 - `POST /api/helpdesk/ask` - Ask the help desk
 
 ### System

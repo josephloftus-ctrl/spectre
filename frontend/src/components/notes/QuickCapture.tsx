@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Plus, Mic, MicOff, Send, X } from 'lucide-react'
+import { Mic, MicOff, Send, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useVoice } from '@/hooks'
 import { cn } from '@/lib/utils'
 
 interface QuickCaptureProps {
   onSubmit: (content: string, isVoiceNote?: boolean) => void
+  onClose: () => void
 }
 
-export function QuickCapture({ onSubmit }: QuickCaptureProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function QuickCapture({ onSubmit, onClose }: QuickCaptureProps) {
   const [content, setContent] = useState('')
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const { isListening, transcript, start, stop, clear, isSupported } = useVoice()
@@ -27,7 +27,6 @@ export function QuickCapture({ onSubmit }: QuickCaptureProps) {
 
     onSubmit(content.trim(), isVoiceMode)
     setContent('')
-    setIsOpen(false)
     setIsVoiceMode(false)
     if (isListening) stop()
   }, [content, isVoiceMode, isListening, onSubmit, stop])
@@ -36,6 +35,9 @@ export function QuickCapture({ onSubmit }: QuickCaptureProps) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
+    }
+    if (e.key === 'Escape') {
+      handleClose()
     }
   }, [handleSubmit])
 
@@ -49,23 +51,11 @@ export function QuickCapture({ onSubmit }: QuickCaptureProps) {
   }, [isListening, start, stop])
 
   const handleClose = useCallback(() => {
-    setIsOpen(false)
     setContent('')
     setIsVoiceMode(false)
     if (isListening) stop()
-  }, [isListening, stop])
-
-  if (!isOpen) {
-    return (
-      <Button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
-        size="icon"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
-    )
-  }
+    onClose()
+  }, [isListening, stop, onClose])
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">

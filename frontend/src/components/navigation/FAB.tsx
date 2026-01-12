@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Plus, X, StickyNote, AlertCircle, ClipboardList } from 'lucide-react'
+import { Plus, X, StickyNote, ClipboardList, ShoppingCart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FABAction {
@@ -11,11 +11,10 @@ interface FABAction {
 
 interface FABProps {
   onAddNote?: () => void
-  onReportIssue?: () => void
   onQuickCount?: () => void
 }
 
-export function FAB({ onAddNote, onReportIssue, onQuickCount }: FABProps) {
+export function FAB({ onAddNote, onQuickCount }: FABProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -45,28 +44,24 @@ export function FAB({ onAddNote, onReportIssue, onQuickCount }: FABProps) {
     }
   }, [onAddNote, navigate])
 
-  const handleReportIssue = useCallback(() => {
-    setIsExpanded(false)
-    if (onReportIssue) {
-      onReportIssue()
-    } else {
-      console.log('Issue reporting not yet implemented')
-    }
-  }, [onReportIssue])
-
   const handleQuickCount = useCallback(() => {
     setIsExpanded(false)
     if (onQuickCount) {
       onQuickCount()
     } else {
-      console.log('Quick count not yet implemented')
+      navigate('/count')
     }
-  }, [onQuickCount])
+  }, [onQuickCount, navigate])
+
+  const handleGoToCart = useCallback(() => {
+    setIsExpanded(false)
+    navigate('/cart')
+  }, [navigate])
 
   const actions: FABAction[] = [
-    { icon: StickyNote, label: 'Add Note', onClick: handleAddNote },
-    { icon: AlertCircle, label: 'Report Issue', onClick: handleReportIssue },
-    { icon: ClipboardList, label: 'Quick Count', onClick: handleQuickCount },
+    { icon: StickyNote, label: 'Quick Note', onClick: handleAddNote },
+    { icon: ClipboardList, label: 'Count Session', onClick: handleQuickCount },
+    { icon: ShoppingCart, label: 'Shopping Cart', onClick: handleGoToCart },
   ]
 
   return (

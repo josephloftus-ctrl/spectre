@@ -9,6 +9,8 @@ export { SearchPage } from './SearchPage'
 export { InventoryPage } from './InventoryPage'
 export { PurchaseMatchDetailPage } from './PurchaseMatchDetailPage'
 export { PurchaseMatchCategoryPage } from './PurchaseMatchCategoryPage'
+export { CartPage } from './CartPage'
+export { CountSessionPage } from './CountSessionPage'
 
 // Legacy exports for internal use by InventoryPage
 export { ScoresPage } from './ScoresPage'

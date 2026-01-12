@@ -29,11 +29,93 @@ from .analysis import (
     analyze_document, compare_with_previous, save_analysis_result,
     check_ollama_available
 )
-from .flag_checker import calculate_unit_score
+from .flag_checker import calculate_unit_score, calculate_comprehensive_score
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def get_purchase_match_results(site_id: str) -> Optional[list]:
+    """
+    Get purchase match results for a site to integrate into health scoring.
+    Returns list of {sku, flag, reason, suggestion} or None if unavailable.
+    """
+    try:
+        from nebula.purchase_match import (
+            load_config, load_canon, build_index, match_inventory, MatchFlag
+        )
+        from nebula.purchase_match.parsed_adapter import ParsedFileInventoryAdapter
+        from nebula.purchase_match.mog import load_mog_directory
+        from backend.core.database import get_ignored_skus
+        from pathlib import Path
+
+        ROOT_DIR = Path(__file__).resolve().parents[2]
+        config_path = ROOT_DIR / "nebula" / "purchase_match" / "unit_vendor_config.json"
+        ips_dir = ROOT_DIR / "Invoice Purchasing Summaries"
+        mog_dir = ROOT_DIR / "FULL MOGS"
+        data_dir = ROOT_DIR / "data" / "processed"
+
+        if not config_path.exists() or not data_dir.exists():
+            return None
+
+        config = load_config(config_path)
+
+        # Load IPS index
+        ips_index = None
+        if ips_dir.exists():
+            ips_files = list(ips_dir.glob("*.xlsx"))
+            if ips_files:
+                records = load_canon(ips_files, config)
+                ips_index = build_index(records)
+
+        if not ips_index:
+            return None
+
+        # Load MOG index (optional)
+        mog_index = None
+        if mog_dir.exists():
+            mog_index = load_mog_directory(mog_dir)
+
+        # Get inventory
+        adapter = ParsedFileInventoryAdapter(data_dir, config)
+        inventory = adapter.get_inventory_for_unit(site_id)
+        if not inventory:
+            return None
+
+        # Get ignored SKUs
+        ignored_skus = get_ignored_skus(site_id)
+
+        # Run matching
+        results = match_inventory(
+            inventory, ips_index, config,
+            mog_index=mog_index,
+            ignored_skus=ignored_skus
+        )
+
+        # Convert to format for comprehensive scoring
+        pm_results = []
+        for r in results:
+            pm_item = {
+                "sku": r.inventory_item.sku,
+                "flag": r.flag.name,  # CLEAN, LIKELY_TYPO, UNKNOWN, ORDERABLE, IGNORED
+                "reason": r.reason,
+            }
+            if r.flag == MatchFlag.LIKELY_TYPO and r.suggested_sku:
+                pm_item["suggestion"] = {
+                    "sku": r.suggested_sku.sku,
+                    "description": r.suggested_sku.description,
+                }
+            pm_results.append(pm_item)
+
+        return pm_results
+
+    except ImportError:
+        logger.debug("Purchase match module not available")
+        return None
+    except Exception as e:
+        logger.warning(f"Could not get purchase match for {site_id}: {e}")
+        return None
 
 # Global scheduler instance
 scheduler: Optional[BackgroundScheduler] = None
@@ -233,8 +315,15 @@ def process_score_job(job: dict) -> dict:
         if not rows:
             return {"error": "No rows in parsed data"}
 
-        # Calculate score
-        score_result = calculate_unit_score(rows)
+        # Try to get purchase match results for comprehensive scoring
+        pm_results = get_purchase_match_results(site_id)
+
+        # Calculate score (uses comprehensive scoring if purchase match available)
+        if pm_results:
+            score_result = calculate_comprehensive_score(rows, pm_results)
+            logger.info(f"Using comprehensive scoring for {site_id} with {len(pm_results)} purchase match results")
+        else:
+            score_result = calculate_unit_score(rows)
 
         # Save to database
         score_id = str(uuid.uuid4())
@@ -244,16 +333,16 @@ def process_score_job(job: dict) -> dict:
             score=score_result["score"],
             status=score_result["status"],
             item_flag_count=score_result["summary"]["flagged_items"],
-            room_flag_count=0,
+            room_flag_count=score_result["summary"].get("flagged_rooms", 0),
             flagged_items=score_result["item_flags"],
-            flagged_rooms=[],
-            room_totals={},
+            flagged_rooms=score_result.get("room_flags", []),
+            room_totals=score_result.get("room_totals", {}),
             total_value=score_result["summary"]["total_value"],
             item_count=score_result["summary"]["item_count"],
             file_id=file_id
         )
 
-        logger.info(f"Scored site {site_id}: score={score_result['score']}, status={score_result['status']}")
+        logger.info(f"Scored site {site_id}: score={score_result['score']}, status={score_result['status']}, rooms={score_result['summary'].get('flagged_rooms', 0)}")
 
         return {
             "success": True,

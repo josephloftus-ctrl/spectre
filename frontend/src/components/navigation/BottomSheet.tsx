@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { StickyNote, Search, Settings, Circle } from 'lucide-react'
+import { StickyNote, Search, Settings, Circle, ShoppingCart, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BottomSheetProps {
@@ -16,6 +16,8 @@ interface SheetItem {
 
 const sheetItems: SheetItem[] = [
   { icon: Search, label: 'Search', path: '/search' },
+  { icon: ShoppingCart, label: 'Cart', path: '/cart' },
+  { icon: ClipboardList, label: 'Count', path: '/count' },
   { icon: StickyNote, label: 'Notes', path: '/notes' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ]

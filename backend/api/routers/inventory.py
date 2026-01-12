@@ -2,7 +2,8 @@
 Inventory API router.
 """
 from fastapi import APIRouter, HTTPException, Query
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 import json
 
 from backend.core.database import (
@@ -10,11 +11,102 @@ from backend.core.database import (
     list_unit_scores, get_unit_score, get_score_history
 )
 
+
+# ============== Response Models ==============
+
+class SiteSummaryResponse(BaseModel):
+    """Summary data for a single site."""
+    site: str
+    latest_total: float
+    delta_pct: float
+    issue_count: int
+    last_updated: str
+    health_score: int = 0
+    health_status: str = "clean"
+    room_flag_count: int = 0
+
+
+class InventorySummaryResponse(BaseModel):
+    """Global inventory summary with all sites."""
+    global_value: float
+    active_sites: int
+    total_issues: int
+    sites: List[SiteSummaryResponse]
+
+
+class FlaggedItem(BaseModel):
+    """An item with health flags."""
+    item: str
+    qty: float
+    uom: str
+    total: float
+    flags: List[str]
+    points: int
+    location: str
+
+
+class FlaggedRoom(BaseModel):
+    """A room with health flags."""
+    location: str
+    total_value: float
+    item_count: int
+    flagged_count: int
+    flag_type: str
+    points: int
+    threshold: Optional[float] = None
+
+
+class RoomTotal(BaseModel):
+    """Totals for a single room/location."""
+    total_value: float
+    item_count: int
+    flagged_count: int
+
+
+class SiteDetailResponse(BaseModel):
+    """Detailed site data with health metrics."""
+    site: str
+    latest_total: float
+    delta_pct: float
+    latest_date: str
+    health_score: int
+    health_status: str
+    item_count: int
+    flagged_items: List[FlaggedItem]
+    item_flag_count: int
+    room_totals: Dict[str, RoomTotal]
+    flagged_rooms: List[FlaggedRoom]
+    room_flag_count: int
+    # Legacy fields
+    total_drifts: List[Any] = []
+    qty_drifts: List[Any] = []
+    file_summaries: List[Any] = []
+
+
+class InventoryItem(BaseModel):
+    """Normalized inventory item."""
+    sku: str
+    description: str
+    quantity: float
+    unit_price: Optional[float] = None
+    uom: Optional[str] = None
+    location: Optional[str] = None
+    vendor: Optional[str] = None
+
+
+class InventoryItemsResponse(BaseModel):
+    """Response for site inventory items."""
+    items: List[InventoryItem]
+    count: int
+    total_in_file: int
+    source_file: Optional[str] = None
+    file_date: Optional[str] = None
+
 router = APIRouter(prefix="/api/inventory", tags=["Inventory"])
 
 
-@router.get("/summary")
-def get_inventory_summary():
+@router.get("/summary", response_model=InventorySummaryResponse)
+def get_inventory_summary() -> InventorySummaryResponse:
     """
     Returns global stats and list of sites with their health.
     Now reads from unit_scores database table instead of filesystem.
@@ -42,7 +134,11 @@ def get_inventory_summary():
             "latest_total": score["total_value"],
             "delta_pct": delta_pct,
             "issue_count": score["item_flag_count"],
-            "last_updated": score["created_at"]
+            "last_updated": score["created_at"],
+            # New fields for comprehensive scoring
+            "health_score": score.get("score", 0),
+            "health_status": score.get("status", "clean"),
+            "room_flag_count": score.get("room_flag_count", 0),
         })
 
         global_value += score["total_value"]
@@ -56,10 +152,11 @@ def get_inventory_summary():
     }
 
 
-@router.get("/sites/{site_id}")
-def get_site_detail(site_id: str):
+@router.get("/sites/{site_id}", response_model=SiteDetailResponse)
+def get_site_detail(site_id: str) -> SiteDetailResponse:
     """
-    Get site details. Now reads from unit_scores database.
+    Get site details with comprehensive scoring data.
+    Includes room breakdown, flagged items, and health metrics.
     """
     score = get_unit_score(site_id)
     if not score:
@@ -78,14 +175,26 @@ def get_site_detail(site_id: str):
         "latest_total": score["total_value"],
         "delta_pct": delta_pct,
         "latest_date": score["created_at"],
+        # Health scoring
+        "health_score": score.get("score", 0),
+        "health_status": score.get("status", "clean"),
+        "item_count": score.get("item_count", 0),
+        # Item-level flags
+        "flagged_items": score.get("flagged_items", []),
+        "item_flag_count": score.get("item_flag_count", 0),
+        # Room-level data
+        "room_totals": score.get("room_totals", {}),
+        "flagged_rooms": score.get("flagged_rooms", []),
+        "room_flag_count": score.get("room_flag_count", 0),
+        # Legacy fields (empty for backwards compatibility)
         "total_drifts": [],
         "qty_drifts": [],
         "file_summaries": []
     }
 
 
-@router.get("/sites/{site_id}/items")
-def get_site_inventory_items(site_id: str, limit: int = Query(500, le=2000)):
+@router.get("/sites/{site_id}/items", response_model=InventoryItemsResponse)
+def get_site_inventory_items(site_id: str, limit: int = Query(500, le=2000)) -> InventoryItemsResponse:
     """
     Get inventory items from the latest valuation file for a site.
     Returns normalized item data suitable for order building or count sessions.

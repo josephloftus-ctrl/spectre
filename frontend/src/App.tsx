@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { DashboardPage, DocumentsPage, NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage, InventoryPage, PurchaseMatchDetailPage, PurchaseMatchCategoryPage } from '@/pages'
+import { DashboardPage, DocumentsPage, NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage, InventoryPage, PurchaseMatchDetailPage, PurchaseMatchCategoryPage, CartPage, CountSessionPage } from '@/pages'
 
 function App() {
   return (
@@ -25,6 +25,10 @@ function App() {
         {/* Legacy site routes - redirect to new location */}
         <Route path="/site/:siteId" element={<SitePage />} />
         <Route path="/:siteId" element={<SitePage />} />
+
+        {/* Cart and Count Sessions */}
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/count" element={<CountSessionPage />} />
 
         {/* Standard pages */}
         <Route path="/documents" element={<DocumentsPage />} />
