@@ -114,6 +114,7 @@ export function DashboardPage() {
         <KPIGrid
           unitsOk={currentCount}
           unitsNeedReview={overdueCount}
+          totalValue={data.global_value}
           totalUnits={data.sites.length}
         />
       </section>
