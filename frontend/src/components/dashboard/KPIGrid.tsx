@@ -1,17 +1,14 @@
 import { Card, CardContent } from "@/components/ui/card"
-import { CheckCircle, AlertTriangle, DollarSign } from "lucide-react"
+import { Building2, AlertTriangle, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface KPIGridProps {
-    unitsOk: number
-    unitsNeedReview: number
+    totalSites: number
+    totalIssues: number
     totalValue: number
-    totalUnits: number
 }
 
-export function KPIGrid({ unitsOk, unitsNeedReview, totalValue, totalUnits }: KPIGridProps) {
-    const allClear = unitsNeedReview === 0 && totalUnits > 0
-
+export function KPIGrid({ totalSites, totalIssues, totalValue }: KPIGridProps) {
     // Format currency
     const formatCurrency = (value: number) => {
         if (value >= 1000000) {
@@ -25,49 +22,43 @@ export function KPIGrid({ unitsOk, unitsNeedReview, totalValue, totalUnits }: KP
 
     return (
         <div className="grid gap-3 grid-cols-3">
-            {/* Units OK */}
+            {/* Total Sites */}
             <Card className="bg-card/50">
                 <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                        <div className={cn(
-                            "p-2 rounded-lg",
-                            allClear ? "bg-emerald-500/10" : "bg-muted"
-                        )}>
-                            <CheckCircle className={cn(
-                                "h-4 w-4",
-                                allClear ? "text-emerald-500" : "text-muted-foreground"
-                            )} />
+                        <div className="p-2 rounded-lg bg-primary/10">
+                            <Building2 className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                            <p className="text-2xl font-bold font-head">{unitsOk}</p>
-                            <p className="text-xs text-muted-foreground">Units OK</p>
+                            <p className="text-2xl font-bold font-head">{totalSites}</p>
+                            <p className="text-xs text-muted-foreground">Active Sites</p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Need Review */}
+            {/* Total Issues */}
             <Card className={cn(
                 "bg-card/50",
-                unitsNeedReview > 0 && "border-amber-500/30"
+                totalIssues > 0 && "border-amber-500/30"
             )}>
                 <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                         <div className={cn(
                             "p-2 rounded-lg",
-                            unitsNeedReview > 0 ? "bg-amber-500/10" : "bg-muted"
+                            totalIssues > 0 ? "bg-amber-500/10" : "bg-emerald-500/10"
                         )}>
                             <AlertTriangle className={cn(
                                 "h-4 w-4",
-                                unitsNeedReview > 0 ? "text-amber-500" : "text-muted-foreground"
+                                totalIssues > 0 ? "text-amber-500" : "text-emerald-500"
                             )} />
                         </div>
                         <div>
                             <p className={cn(
                                 "text-2xl font-bold font-head",
-                                unitsNeedReview > 0 ? "text-amber-500" : ""
-                            )}>{unitsNeedReview}</p>
-                            <p className="text-xs text-muted-foreground">Need Review</p>
+                                totalIssues > 0 ? "text-amber-500" : ""
+                            )}>{totalIssues}</p>
+                            <p className="text-xs text-muted-foreground">Issues Found</p>
                         </div>
                     </div>
                 </CardContent>

@@ -103,19 +103,14 @@ export function DashboardPage() {
     return (b.latest_total || 0) - (a.latest_total || 0)
   })
 
-  // Count sites by status
-  const currentCount = data.sites.filter((s: SiteSummary) => isInventoryCurrent(s.last_updated).status === 'current').length
-  const overdueCount = data.sites.filter((s: SiteSummary) => isInventoryCurrent(s.last_updated).status !== 'current').length
-
   return (
     <div className="space-y-6 animate-page-in">
       {/* KPI Section */}
       <section>
         <KPIGrid
-          unitsOk={currentCount}
-          unitsNeedReview={overdueCount}
+          totalSites={data.sites.length}
+          totalIssues={data.total_issues}
           totalValue={data.global_value}
-          totalUnits={data.sites.length}
         />
       </section>
 
