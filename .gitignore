@@ -68,3 +68,7 @@ Training/
 nebula/
 inventory_audit_report.html
 inventory_watch.log
+
+# Plugin directory - client-specific configs (templates, MOGs, distributors)
+# Use /plugins/ to only match top-level, not backend/core/plugins/
+/plugins/

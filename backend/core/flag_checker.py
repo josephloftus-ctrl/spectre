@@ -7,6 +7,7 @@ Scoring rules:
   - Big Dollar: Total Price > $250 → 1 pt
   - SKU Mismatch (from purchase match): LIKELY_TYPO → 2 pts
   - Unknown SKU (from purchase match): UNKNOWN → 1 pt
+  - Flagged Distributor (from plugin): warning → 2 pts, error → 3 pts
 
 - Room-level flags:
   - Low Dedicated Storage: Walk-in/Freezer/Dry Storage < $1,000 → 2 pts
@@ -16,8 +17,11 @@ Higher score = worse health. Units sorted worst-first.
 """
 
 import re
+import logging
 from typing import Optional, List, Dict, Any
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 
 # Dedicated storage areas (should have significant inventory)
@@ -494,4 +498,93 @@ def calculate_comprehensive_score(
         # Re-sort by points
         result["item_flags"].sort(key=lambda x: x["points"], reverse=True)
 
+    # Check for distributor flags (from plugin system)
+    distributor_flags = check_distributor_flags(rows)
+    if distributor_flags:
+        result["score"] += distributor_flags["score"]
+        result["status"] = get_status_from_score(result["score"])
+        result["item_flags"].extend(distributor_flags["flags"])
+        result["summary"]["flagged_items"] = len(result["item_flags"])
+        result["item_flags"].sort(key=lambda x: x["points"], reverse=True)
+
     return result
+
+
+def check_distributor_flags(rows: List[Dict]) -> Optional[Dict]:
+    """
+    Check for flagged distributors using the plugin system.
+
+    Returns:
+        {
+            "score": int,
+            "flags": [...]
+        }
+        or None if no plugin loaded
+    """
+    try:
+        from backend.core.plugins import PluginLoader
+        loader = PluginLoader.get()
+
+        if not loader.has_plugins():
+            return None
+
+    except ImportError:
+        logger.debug("Plugin system not available")
+        return None
+
+    score = 0
+    flags = []
+    seen_distributors = set()
+
+    for row in rows:
+        # Find distributor in row
+        distributor = ""
+        item_desc = ""
+
+        for key, value in row.items():
+            key_lower = key.lower() if isinstance(key, str) else ""
+            if "distributor" in key_lower or "vendor" in key_lower:
+                distributor = str(value).strip() if value else ""
+            elif "description" in key_lower or "item" in key_lower:
+                item_desc = str(value) if value else ""
+
+        if not distributor or distributor in seen_distributors:
+            continue
+
+        # Check if this distributor is flagged
+        is_flagged, reason, severity = loader.is_distributor_flagged(distributor)
+
+        if is_flagged:
+            seen_distributors.add(distributor)
+
+            # Assign points based on severity
+            if severity == "error":
+                points = 3
+            elif severity == "warning":
+                points = 2
+            else:  # info
+                points = 1
+
+            score += points
+            flags.append({
+                "item": f"Distributor: {distributor}",
+                "qty": 0,
+                "uom": "",
+                "total": 0,
+                "flags": ["flagged_distributor"],
+                "points": points,
+                "location": "N/A",
+                "distributor_info": {
+                    "name": distributor,
+                    "reason": reason,
+                    "severity": severity
+                }
+            })
+
+    if not flags:
+        return None
+
+    return {
+        "score": score,
+        "flags": flags
+    }
