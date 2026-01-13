@@ -7,7 +7,7 @@ import yaml
 
 from .schema import (
     LoadedPlugin, PluginManifest, DistributorsConfig, SitesConfig,
-    LocationsConfig, FlagsConfig, SiteEntry, DistributorEntry
+    LocationsConfig, FlagsConfig, CategorizationConfig, SiteEntry, DistributorEntry
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,7 @@ class PluginLoader:
         sites = SitesConfig()
         locations = LocationsConfig()
         flags = FlagsConfig()
+        categorization = CategorizationConfig()
 
         if "distributors" in manifest.provides:
             dist_data = self._load_yaml(plugin_dir / "distributors.yaml")
@@ -96,12 +97,18 @@ class PluginLoader:
             if flags_data:
                 flags = FlagsConfig(**flags_data)
 
+        # Always try to load categorization if file exists
+        cat_data = self._load_yaml(plugin_dir / "categorization.yaml")
+        if cat_data:
+            categorization = CategorizationConfig(**cat_data)
+
         plugin = LoadedPlugin(
             manifest=manifest,
             distributors=distributors,
             sites=sites,
             locations=locations,
             flags=flags,
+            categorization=categorization,
             plugin_dir=str(plugin_dir)
         )
 
@@ -252,6 +259,78 @@ class PluginLoader:
 
         return None
 
+    def get_inventory_template_path(self, site_id: str) -> Optional[Path]:
+        """
+        Get inventory template path with fallback to blank.xlsx.
+
+        Tries in order:
+        1. Site-specific template from plugin config
+        2. Generic blank.xlsx from any plugin's templates folder
+        3. Legacy Templates/ folder
+
+        Args:
+            site_id: Site identifier
+
+        Returns:
+            Path to template file, or None if no template found
+        """
+        # Try site-specific first
+        site_template = self.get_template_path(site_id)
+        if site_template and site_template.exists():
+            logger.debug(f"Using site-specific template: {site_template}")
+            return site_template
+
+        # Fallback to blank.xlsx in any plugin's templates folder
+        for plugin in self.plugins.values():
+            blank_path = Path(plugin.plugin_dir) / "templates" / "blank.xlsx"
+            if blank_path.exists():
+                logger.debug(f"Using blank template fallback: {blank_path}")
+                return blank_path
+
+        # Try legacy Templates folder at project root
+        project_root = Path(plugin.plugin_dir).parent.parent if self.plugins else None
+        if project_root:
+            legacy_paths = [
+                project_root / "Templates" / "EmptyInventoryTemplate.xlsx",
+                project_root / "Templates" / "blank.xlsx",
+            ]
+            for legacy_path in legacy_paths:
+                if legacy_path.exists():
+                    logger.debug(f"Using legacy template: {legacy_path}")
+                    return legacy_path
+
+        logger.warning(f"No inventory template found for site: {site_id}")
+        return None
+
+    def get_cart_template_path(self) -> Optional[Path]:
+        """
+        Get cart template path with fallback.
+
+        Tries in order:
+        1. cart.xlsx from any plugin's templates folder
+        2. CartTemplate.xlsx from legacy Templates folder
+
+        Returns:
+            Path to cart template file, or None if not found
+        """
+        # Try plugin templates folders
+        for plugin in self.plugins.values():
+            cart_path = Path(plugin.plugin_dir) / "templates" / "cart.xlsx"
+            if cart_path.exists():
+                logger.debug(f"Using plugin cart template: {cart_path}")
+                return cart_path
+
+        # Try legacy Templates folder
+        project_root = Path(list(self.plugins.values())[0].plugin_dir).parent.parent if self.plugins else None
+        if project_root:
+            legacy_cart = project_root / "Templates" / "CartTemplate.xlsx"
+            if legacy_cart.exists():
+                logger.debug(f"Using legacy cart template: {legacy_cart}")
+                return legacy_cart
+
+        logger.warning("No cart template found")
+        return None
+
     def get_mog_path(self, site_id: str) -> Optional[Path]:
         """Get the MOG file path for a site from plugin."""
         config = self.get_site_config(site_id)
@@ -311,6 +390,95 @@ class PluginLoader:
         for plugin in self.plugins.values():
             rules.extend(plugin.flags.rules)
         return rules
+
+    # -------------------------------------------------------------------------
+    # Categorization Methods
+    # -------------------------------------------------------------------------
+
+    def categorize_item(self, item_desc: str, brand: str = '', pack: str = '') -> tuple[str, bool]:
+        """
+        Categorize an item using plugin keywords.
+
+        Args:
+            item_desc: Item description
+            brand: Brand name (optional)
+            pack: Pack size (optional)
+
+        Returns:
+            (location, never_count) tuple
+        """
+        item_upper = str(item_desc).upper().strip()
+
+        # Get merged categorization from all plugins
+        cat = self._get_merged_categorization()
+
+        # Check NEVER INVENTORY first
+        for keyword in cat.get('never_inventory', []):
+            if keyword.upper() in item_upper:
+                return ('NEVER INVENTORY', True)
+
+        # Check Freezer
+        for keyword in cat.get('freezer', []):
+            if keyword.upper() in item_upper:
+                return ('Freezer', False)
+
+        # Check Walk In Cooler
+        for keyword in cat.get('cooler', []):
+            if keyword.upper() in item_upper:
+                return ('Walk In Cooler', False)
+
+        # Check Beverage (skip if BAKING in name)
+        if 'BAKING' not in item_upper:
+            for keyword in cat.get('beverage', []):
+                if keyword.upper() in item_upper:
+                    return ('Beverage Room', False)
+
+        # Check Dry Storage Food
+        for keyword in cat.get('dry_food', []):
+            if keyword.upper() in item_upper:
+                return ('Dry Storage Food', False)
+
+        # Check Dry Storage Supplies
+        for keyword in cat.get('dry_supplies', []):
+            if keyword.upper() in item_upper:
+                return ('Dry Storage Supplies', False)
+
+        # Check Chemical Locker
+        for keyword in cat.get('chemical', []):
+            if keyword.upper() in item_upper:
+                return ('Chemical Locker', False)
+
+        # Fallback checks
+        if 'FROZ' in item_upper or 'IQF' in item_upper:
+            return ('Freezer', False)
+        if 'REFRIG' in item_upper or 'COLD' in item_upper:
+            return ('Walk In Cooler', False)
+
+        return ('UNASSIGNED', False)
+
+    def _get_merged_categorization(self) -> dict:
+        """Get merged categorization keywords from all plugins."""
+        merged = {
+            'never_inventory': [],
+            'freezer': [],
+            'cooler': [],
+            'beverage': [],
+            'dry_food': [],
+            'dry_supplies': [],
+            'chemical': [],
+        }
+
+        for plugin in self.plugins.values():
+            cat = plugin.categorization
+            merged['never_inventory'].extend(cat.never_inventory)
+            merged['freezer'].extend(cat.freezer)
+            merged['cooler'].extend(cat.cooler)
+            merged['beverage'].extend(cat.beverage)
+            merged['dry_food'].extend(cat.dry_food)
+            merged['dry_supplies'].extend(cat.dry_supplies)
+            merged['chemical'].extend(cat.chemical)
+
+        return merged
 
     # -------------------------------------------------------------------------
     # Utility

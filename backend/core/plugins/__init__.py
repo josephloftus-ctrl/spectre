@@ -29,6 +29,7 @@ from .schema import (
     FlagsConfig,
     FlagRule,
     ThresholdsConfig,
+    CategorizationConfig,
 )
 
 __all__ = [
@@ -43,4 +44,5 @@ __all__ = [
     "FlagsConfig",
     "FlagRule",
     "ThresholdsConfig",
+    "CategorizationConfig",
 ]

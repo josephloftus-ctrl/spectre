@@ -88,6 +88,17 @@ class PluginManifest(BaseModel):
     settings: PluginSettings = PluginSettings()
 
 
+class CategorizationConfig(BaseModel):
+    """Categorization keywords from categorization.yaml."""
+    never_inventory: list[str] = []
+    freezer: list[str] = []
+    cooler: list[str] = []
+    beverage: list[str] = []
+    dry_food: list[str] = []
+    dry_supplies: list[str] = []
+    chemical: list[str] = []
+
+
 class LoadedPlugin(BaseModel):
     """A fully loaded plugin with all its configurations."""
     manifest: PluginManifest
@@ -95,6 +106,7 @@ class LoadedPlugin(BaseModel):
     sites: SitesConfig = SitesConfig()
     locations: LocationsConfig = LocationsConfig()
     flags: FlagsConfig = FlagsConfig()
+    categorization: CategorizationConfig = CategorizationConfig()
     plugin_dir: str  # Path to plugin directory
 
     class Config:
