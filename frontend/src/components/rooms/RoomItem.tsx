@@ -2,10 +2,10 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ItemLocation } from '@/lib/api';
+import { RoomInventoryItem } from '@/lib/api';
 
 interface RoomItemProps {
-    item: ItemLocation;
+    item: RoomInventoryItem;
     isDragOverlay?: boolean;
 }
 
@@ -51,7 +51,13 @@ export function RoomItem({ item, isDragOverlay = false }: RoomItemProps) {
             </button>
             <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{item.sku}</p>
+                <p className="text-sm font-medium truncate" title={item.description}>
+                    {item.description || item.sku}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                    {item.quantity} {item.uom || 'units'}
+                    {item.unit_price && ` - $${item.unit_price.toFixed(2)}`}
+                </p>
             </div>
             {item.auto_assigned && (
                 <span className="text-[10px] px-1.5 py-0.5 bg-muted text-muted-foreground rounded">
@@ -63,13 +69,13 @@ export function RoomItem({ item, isDragOverlay = false }: RoomItemProps) {
 }
 
 // Static version for drag overlay
-export function RoomItemOverlay({ item }: { item: ItemLocation }) {
+export function RoomItemOverlay({ item }: { item: RoomInventoryItem }) {
     return (
         <div className="flex items-center gap-2 p-2 bg-card border border-primary rounded-md shadow-lg">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
             <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{item.sku}</p>
+                <p className="text-sm font-medium truncate">{item.description || item.sku}</p>
             </div>
         </div>
     );

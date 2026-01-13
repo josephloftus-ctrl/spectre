@@ -27,14 +27,14 @@ import {
     fetchItemsByRoom,
     moveItemToRoom,
     RoomWithItems,
-    ItemLocation,
+    RoomInventoryItem,
 } from '@/lib/api';
 import { RoomCard, RoomItemOverlay, CreateRoomDialog } from '@/components/rooms';
 
 export function RoomsPage() {
     const queryClient = useQueryClient();
     const [selectedSite, setSelectedSite] = useState<string>('');
-    const [activeItem, setActiveItem] = useState<ItemLocation | null>(null);
+    const [activeItem, setActiveItem] = useState<RoomInventoryItem | null>(null);
     const [rooms, setRooms] = useState<RoomWithItems[]>([]);
 
     // Sensors for drag-and-drop
@@ -82,7 +82,7 @@ export function RoomsPage() {
 
     // Find item and its room
     const findItemAndRoom = useCallback(
-        (sku: string): { item: ItemLocation | null; roomName: string | null } => {
+        (sku: string): { item: RoomInventoryItem | null; roomName: string | null } => {
             for (const room of rooms) {
                 const item = room.items.find(i => i.sku === sku);
                 if (item) {

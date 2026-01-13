@@ -17,6 +17,8 @@ from .locations import (
     get_location_summary,
     get_location_order,
 )
+from .files import list_files
+from .base import FileStatus
 
 
 def list_rooms(site_id: str, include_empty: bool = True) -> List[Dict[str, Any]]:
@@ -226,31 +228,129 @@ def get_items_by_room(
     include_empty_rooms: bool = True
 ) -> List[Dict[str, Any]]:
     """
-    Get all items organized by room.
+    Get all inventory items organized by room.
 
-    Returns a list of rooms, each with their items.
+    Loads items from parsed inventory files and merges with room assignments.
+    Items without explicit room assignments go to UNASSIGNED.
     """
     rooms = list_rooms(site_id, include_empty=include_empty_rooms)
 
-    # Get all item locations for this site
+    # Get all room assignments for this site
     item_locations = list_item_locations(site_id)
+    location_by_sku = {item["sku"]: item for item in item_locations}
+
+    # Load inventory items from the latest parsed file
+    inventory_items = _load_inventory_items(site_id)
 
     # Group items by location
     items_by_location: Dict[str, List[Dict]] = {}
-    for item in item_locations:
-        location = item.get("location", "UNASSIGNED")
+    for item in inventory_items:
+        sku = item.get("sku", "")
+        # Check if this item has a room assignment
+        if sku in location_by_sku:
+            location_data = location_by_sku[sku]
+            location = location_data.get("location", "UNASSIGNED")
+            # Merge location data into item
+            item["location"] = location
+            item["auto_assigned"] = location_data.get("auto_assigned", True)
+            item["sort_order"] = location_data.get("sort_order", 0)
+        else:
+            location = "UNASSIGNED"
+            item["location"] = location
+            item["auto_assigned"] = True
+            item["sort_order"] = 0
+
         if location not in items_by_location:
             items_by_location[location] = []
         items_by_location[location].append(item)
 
-    # Add items to rooms
+    # Add items to rooms and update counts
     result = []
     for room in rooms:
         room_with_items = dict(room)
-        room_with_items["items"] = items_by_location.get(room["name"], [])
+        room_items = items_by_location.get(room["name"], [])
+        room_with_items["items"] = room_items
+        room_with_items["item_count"] = len(room_items)
         result.append(room_with_items)
 
     return result
+
+
+def _load_inventory_items(site_id: str, limit: int = 2000) -> List[Dict[str, Any]]:
+    """Load inventory items from the latest parsed file for a site."""
+    files = list_files(status=FileStatus.COMPLETED, site_id=site_id, limit=1)
+    if not files:
+        return []
+
+    file_record = files[0]
+    parsed_data = file_record.get("parsed_data")
+
+    if not parsed_data:
+        return []
+
+    try:
+        if isinstance(parsed_data, str):
+            data = json.loads(parsed_data)
+        else:
+            data = parsed_data
+    except json.JSONDecodeError:
+        return []
+
+    rows = data.get("rows", [])
+    items = []
+
+    for row in rows[:limit]:
+        item = _normalize_row(row)
+        if item:
+            items.append(item)
+
+    return items
+
+
+def _normalize_row(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Normalize a row from parsed data into an inventory item."""
+    item = {
+        "sku": "",
+        "description": "",
+        "quantity": 0,
+        "unit_price": None,
+        "uom": None,
+        "vendor": None,
+    }
+
+    for key, value in row.items():
+        if not key or not isinstance(key, str):
+            continue
+        key_lower = key.lower().strip()
+
+        if "sku" in key_lower or "item #" in key_lower or "item number" in key_lower or key_lower == "item":
+            item["sku"] = str(value).strip() if value else ""
+        elif "description" in key_lower or "item name" in key_lower:
+            item["description"] = str(value).strip() if value else ""
+        elif "quantity" in key_lower or key_lower == "qty" or key_lower == "count":
+            try:
+                item["quantity"] = float(str(value).replace(",", "")) if value else 0
+            except (ValueError, TypeError):
+                item["quantity"] = 0
+        elif "unit" in key_lower and "price" in key_lower:
+            try:
+                val_str = str(value).replace("$", "").replace(",", "").strip()
+                item["unit_price"] = float(val_str) if val_str else None
+            except (ValueError, TypeError):
+                pass
+        elif key_lower == "uom" or "unit of" in key_lower:
+            item["uom"] = str(value).strip() if value else None
+        elif "vendor" in key_lower or "supplier" in key_lower:
+            item["vendor"] = str(value).strip() if value else None
+
+    if not item["sku"] and item["description"]:
+        item["sku"] = item["description"][:20].upper().replace(" ", "_")
+    if not item["sku"] and not item["description"]:
+        return None
+    if not item["description"]:
+        item["description"] = item["sku"]
+
+    return item
 
 
 def move_item_to_room(

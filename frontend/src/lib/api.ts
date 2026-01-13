@@ -1365,8 +1365,20 @@ export interface RoomInfo {
     is_active: boolean;
 }
 
+export interface RoomInventoryItem {
+    sku: string;
+    description: string;
+    quantity: number;
+    unit_price?: number;
+    uom?: string;
+    vendor?: string;
+    location: string;
+    auto_assigned: boolean;
+    sort_order: number;
+}
+
 export interface RoomWithItems extends RoomInfo {
-    items: ItemLocation[];
+    items: RoomInventoryItem[];
 }
 
 export interface ItemLocation {
