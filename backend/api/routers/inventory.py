@@ -279,3 +279,57 @@ def get_site_inventory_items(site_id: str, limit: int = Query(500, le=2000)) -> 
         "source_file": file_record.get("filename"),
         "file_date": file_record.get("created_at")
     }
+
+
+@router.get("/sites/{site_id}/gl-codes")
+def get_site_gl_codes(site_id: str) -> Dict[str, Any]:
+    """
+    Get unique GL codes from the site's inventory data.
+
+    GL codes are extracted from columns like 'Compass Group USA->GL Codes' or 'GL Codes'.
+    """
+    files = list_files(status=FileStatus.COMPLETED, site_id=site_id, limit=1)
+    if not files:
+        return {"gl_codes": [], "count": 0}
+
+    file_record = files[0]
+    parsed_data = file_record.get("parsed_data")
+
+    if not parsed_data:
+        return {"gl_codes": [], "count": 0}
+
+    try:
+        if isinstance(parsed_data, str):
+            data = json.loads(parsed_data)
+        else:
+            data = parsed_data
+    except json.JSONDecodeError:
+        return {"gl_codes": [], "count": 0}
+
+    rows = data.get("rows", [])
+
+    # GL code column names to check
+    gl_code_keys = [
+        "Compass Group USA->GL Codes",
+        "GL Codes",
+        "gl_code",
+        "GL Code",
+        "gl code",
+    ]
+
+    gl_codes = set()
+    for row in rows:
+        for key in gl_code_keys:
+            if key in row and row[key]:
+                code = str(row[key]).strip()
+                if code:
+                    gl_codes.add(code)
+
+    # Sort alphabetically
+    sorted_codes = sorted(gl_codes)
+
+    return {
+        "gl_codes": sorted_codes,
+        "count": len(sorted_codes),
+        "source_file": file_record.get("filename"),
+    }

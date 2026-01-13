@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import {
   fetchOffCatalogItems, createOffCatalogItem, updateOffCatalogItem,
   deleteOffCatalogItem, fetchSummary, OffCatalogItem, OffCatalogItemRequest
 } from '@/lib/api'
+import { RoomSelector, GLCodeSelector } from '@/components/rooms'
 import { cn } from '@/lib/utils'
 import {
   Select,
@@ -71,6 +72,12 @@ function ItemRow({ item, onEdit, onDelete, deleting }: ItemRowProps) {
               <span>{item.uom}</span>
             </>
           )}
+          {item.location && (
+            <>
+              <span>•</span>
+              <Badge variant="secondary" className="text-xs py-0">{item.location}</Badge>
+            </>
+          )}
         </div>
       </div>
 
@@ -124,12 +131,13 @@ function ItemRow({ item, onEdit, onDelete, deleting }: ItemRowProps) {
 // Add/Edit form
 interface ItemFormProps {
   item?: OffCatalogItem
+  siteId: string
   onSave: (data: OffCatalogItemRequest) => Promise<void>
   onCancel: () => void
   saving: boolean
 }
 
-function ItemForm({ item, onSave, onCancel, saving }: ItemFormProps) {
+function ItemForm({ item, siteId, onSave, onCancel, saving }: ItemFormProps) {
   const [formData, setFormData] = useState<OffCatalogItemRequest>({
     dist_num: item?.dist_num || '',
     cust_num: item?.cust_num || '',
@@ -138,12 +146,21 @@ function ItemForm({ item, onSave, onCancel, saving }: ItemFormProps) {
     uom: item?.uom || '',
     unit_price: item?.unit_price || undefined,
     distributor: item?.distributor || '',
+    location: item?.location || '',
     notes: item?.notes || '',
   })
+  const [glCode, setGlCode] = useState<string>(item?.notes?.match(/GL: ([^\s,]+)/)?.[1] || '')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSave(formData)
+    // Append GL code to notes if provided
+    let notes = formData.notes || ''
+    if (glCode) {
+      // Remove any existing GL code from notes first
+      notes = notes.replace(/GL: [^\s,]+,?\s*/g, '').trim()
+      notes = notes ? `GL: ${glCode}, ${notes}` : `GL: ${glCode}`
+    }
+    await onSave({ ...formData, notes })
   }
 
   return (
@@ -221,6 +238,28 @@ function ItemForm({ item, onSave, onCancel, saving }: ItemFormProps) {
           onChange={e => setFormData({ ...formData, distributor: e.target.value })}
           placeholder="e.g., Sysco"
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm text-muted-foreground">Room / Location</label>
+          <RoomSelector
+            siteId={siteId}
+            value={formData.location || null}
+            onChange={(room) => setFormData({ ...formData, location: room })}
+            includeUnassigned
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <label className="text-sm text-muted-foreground">GL Code</label>
+          <GLCodeSelector
+            siteId={siteId}
+            value={glCode || null}
+            onChange={setGlCode}
+            className="mt-1"
+          />
+        </div>
       </div>
 
       <div>
@@ -402,6 +441,7 @@ export function OffCatalogPage() {
       {showForm && (
         <ItemForm
           item={editingItem}
+          siteId={selectedSite}
           onSave={handleSave}
           onCancel={handleCancel}
           saving={saving}

@@ -137,6 +137,18 @@ from .locations import (
     get_location_sort_key,
 )
 
+# Rooms
+from .rooms import (
+    list_rooms,
+    get_room,
+    create_custom_room,
+    update_custom_room,
+    delete_custom_room,
+    get_items_by_room,
+    move_item_to_room,
+    bulk_move_items,
+)
+
 # Inventory snapshots
 from .snapshots import (
     create_inventory_snapshot,
@@ -255,6 +267,15 @@ __all__ = [
     "reset_location_order",
     "list_available_locations",
     "get_location_sort_key",
+    # Rooms
+    "list_rooms",
+    "get_room",
+    "create_custom_room",
+    "update_custom_room",
+    "delete_custom_room",
+    "get_items_by_room",
+    "move_item_to_room",
+    "bulk_move_items",
     # Snapshots
     "create_inventory_snapshot",
     "get_inventory_snapshot",

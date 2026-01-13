@@ -321,6 +321,20 @@ def init_db():
                 UNIQUE(site_id, location)
             );
 
+            -- Custom rooms per site (user-created rooms beyond predefined)
+            CREATE TABLE IF NOT EXISTS custom_rooms (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                display_name TEXT,
+                sort_order INTEGER DEFAULT 50,
+                color TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, name)
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
             CREATE INDEX IF NOT EXISTS idx_files_site ON files(site_id);
@@ -343,6 +357,7 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_location_order_site ON location_order(site_id);
             CREATE INDEX IF NOT EXISTS idx_off_catalog_site ON off_catalog_items(site_id);
             CREATE INDEX IF NOT EXISTS idx_off_catalog_dist ON off_catalog_items(dist_num);
+            CREATE INDEX IF NOT EXISTS idx_custom_rooms_site ON custom_rooms(site_id);
         """)
 
     # Run migrations for existing databases
@@ -365,3 +380,20 @@ def migrate_db():
 
         if 'collection' not in columns:
             conn.execute("ALTER TABLE embeddings ADD COLUMN collection TEXT DEFAULT 'knowledge_base'")
+
+        # Create custom_rooms table if it doesn't exist (for existing databases)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS custom_rooms (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                display_name TEXT,
+                sort_order INTEGER DEFAULT 50,
+                color TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, name)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_custom_rooms_site ON custom_rooms(site_id)")

@@ -41,6 +41,7 @@ from backend.api.routers import (
     memory_router,
     templates_router,
     history_router,
+    rooms_router,
 )
 
 
@@ -99,6 +100,7 @@ app.include_router(catalog_router)
 # Count sessions and locations
 app.include_router(counting_router)
 app.include_router(locations_router)
+app.include_router(rooms_router)
 app.include_router(snapshots_router)
 
 # Export and utilities

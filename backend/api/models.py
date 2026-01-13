@@ -74,3 +74,31 @@ class CountItemRequest(BaseModel):
 
 class BulkCountItemsRequest(BaseModel):
     items: List[Dict[str, Any]]
+
+
+# ============== Rooms ==============
+
+class CreateRoomRequest(BaseModel):
+    """Request model for creating a custom room."""
+    name: str
+    display_name: Optional[str] = None
+    sort_order: int = 50
+    color: Optional[str] = None
+
+
+class UpdateRoomRequest(BaseModel):
+    """Request model for updating a custom room."""
+    display_name: Optional[str] = None
+    sort_order: Optional[int] = None
+    color: Optional[str] = None
+
+
+class MoveItemRequest(BaseModel):
+    """Request model for moving an item to a room."""
+    room: str
+    sort_order: int = 0
+
+
+class BulkMoveItemsRequest(BaseModel):
+    """Request model for bulk moving items between rooms."""
+    moves: List[Dict[str, Any]]  # Each dict has: sku, room, sort_order (optional)

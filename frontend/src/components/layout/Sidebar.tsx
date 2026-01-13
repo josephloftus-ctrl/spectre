@@ -25,7 +25,11 @@ export function usePageTitle(): string {
         '/standup': 'Daily Standup',
         '/glance': 'Day At A Glance',
         '/collections': 'Collections',
-        '/settings': 'Settings'
+        '/settings': 'Settings',
+        '/rooms': 'Rooms',
+        '/cart': 'Cart',
+        '/count': 'Count Session',
+        '/off-catalog': 'Off-Catalog',
     }
 
     // Check for site detail pages (e.g., /pseg_nhq) - legacy routes

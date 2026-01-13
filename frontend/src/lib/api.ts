@@ -1351,3 +1351,131 @@ export const generateCustNum = async (
     });
     return data;
 };
+
+// ============== Rooms API ==============
+
+export interface RoomInfo {
+    id?: string;
+    name: string;
+    display_name: string;
+    sort_order: number;
+    item_count: number;
+    is_predefined: boolean;
+    color?: string;
+    is_active: boolean;
+}
+
+export interface RoomWithItems extends RoomInfo {
+    items: ItemLocation[];
+}
+
+export interface ItemLocation {
+    id: string;
+    site_id: string;
+    sku: string;
+    location: string;
+    zone?: string;
+    sort_order: number;
+    never_count: boolean;
+    auto_assigned: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CreateRoomRequest {
+    name: string;
+    display_name?: string;
+    sort_order?: number;
+    color?: string;
+}
+
+export interface MoveItemRequest {
+    room: string;
+    sort_order?: number;
+}
+
+export const fetchRooms = async (
+    siteId: string,
+    includeEmpty: boolean = true
+): Promise<{ rooms: RoomInfo[]; count: number }> => {
+    const { data } = await api.get(`/rooms/${siteId}`, {
+        params: { include_empty: includeEmpty }
+    });
+    return data;
+};
+
+export const fetchRoom = async (
+    siteId: string,
+    roomName: string
+): Promise<{ room: RoomInfo }> => {
+    const { data } = await api.get(`/rooms/${siteId}/${encodeURIComponent(roomName)}`);
+    return data;
+};
+
+export const createRoom = async (
+    siteId: string,
+    room: CreateRoomRequest
+): Promise<{ success: boolean; room: RoomInfo }> => {
+    const { data } = await api.post(`/rooms/${siteId}`, room);
+    return data;
+};
+
+export const updateRoom = async (
+    siteId: string,
+    roomName: string,
+    updates: Partial<CreateRoomRequest>
+): Promise<{ success: boolean; room: RoomInfo }> => {
+    const { data } = await api.put(`/rooms/${siteId}/${encodeURIComponent(roomName)}`, updates);
+    return data;
+};
+
+export const deleteRoom = async (
+    siteId: string,
+    roomName: string,
+    moveItemsTo: string = 'UNASSIGNED'
+): Promise<{ success: boolean; message: string }> => {
+    const { data } = await api.delete(`/rooms/${siteId}/${encodeURIComponent(roomName)}`, {
+        params: { move_items_to: moveItemsTo }
+    });
+    return data;
+};
+
+export const fetchItemsByRoom = async (
+    siteId: string,
+    includeEmptyRooms: boolean = true
+): Promise<{ rooms: RoomWithItems[]; count: number }> => {
+    const { data } = await api.get(`/rooms/${siteId}/items/all`, {
+        params: { include_empty_rooms: includeEmptyRooms }
+    });
+    return data;
+};
+
+export const moveItemToRoom = async (
+    siteId: string,
+    sku: string,
+    room: string,
+    sortOrder: number = 0
+): Promise<{ success: boolean; item_location: ItemLocation }> => {
+    const { data } = await api.put(`/rooms/${siteId}/items/${encodeURIComponent(sku)}`, {
+        room,
+        sort_order: sortOrder
+    });
+    return data;
+};
+
+export const bulkMoveItems = async (
+    siteId: string,
+    moves: Array<{ sku: string; room: string; sort_order?: number }>
+): Promise<{ success: boolean; moved: number; errors: number }> => {
+    const { data } = await api.put(`/rooms/${siteId}/items/bulk/move`, { moves });
+    return data;
+};
+
+// ============== GL Codes API ==============
+
+export const fetchGLCodes = async (
+    siteId: string
+): Promise<{ gl_codes: string[]; count: number; source_file?: string }> => {
+    const { data } = await api.get(`/inventory/sites/${siteId}/gl-codes`);
+    return data;
+};
