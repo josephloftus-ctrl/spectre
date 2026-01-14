@@ -1,11 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchSummary, SiteSummary, formatSiteName } from '@/lib/api'
 import { KPIGrid } from '@/components/dashboard/KPIGrid'
 import { SkeletonKPI } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Activity, CheckCircle, AlertTriangle, Clock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Activity, CheckCircle, AlertTriangle, Clock, LayoutGrid, ArrowRightLeft } from 'lucide-react'
+import { PurchaseMatchPage } from './PurchaseMatchPage'
+import { cn } from '@/lib/utils'
+
+type DashboardTab = 'overview' | 'match'
 
 // Check if inventory is current (deadline: Friday 8am)
 function isInventoryCurrent(lastUpdated?: string): { current: boolean; daysOld: number; status: 'current' | 'due' | 'overdue' } {
@@ -36,6 +41,16 @@ function isInventoryCurrent(lastUpdated?: string): { current: boolean; daysOld: 
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = (searchParams.get('tab') as DashboardTab) || 'overview'
+
+  const handleTabChange = (tab: DashboardTab) => {
+    if (tab === 'overview') {
+      setSearchParams({})
+    } else {
+      setSearchParams({ tab })
+    }
+  }
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['summary'],
@@ -105,101 +120,132 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-page-in">
-      {/* KPI Section */}
-      <section>
-        <KPIGrid
-          totalSites={data.sites.length}
-          totalIssues={data.total_issues}
-          totalValue={data.global_value}
-        />
-      </section>
-
-      {/* Site List */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold font-head">Sites</h2>
-          <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border">
-            {data.sites.length} Active
-          </div>
+      {/* Tab Navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
+          <Button
+            variant={activeTab === 'overview' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => handleTabChange('overview')}
+            className={cn("gap-2", activeTab === 'overview' && "shadow-sm")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Overview
+          </Button>
+          <Button
+            variant={activeTab === 'match' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => handleTabChange('match')}
+            className={cn("gap-2", activeTab === 'match' && "shadow-sm")}
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            Purchase Match
+          </Button>
         </div>
-        <div className="space-y-3">
-          {sortedSites.map((site: SiteSummary, index: number) => {
-            const currency = isInventoryCurrent(site.last_updated)
-            const healthStatus = site.health_status || 'clean'
-            const healthScore = site.health_score || 0
+      </div>
 
-            // Border color based on worst status (currency or health)
-            let borderColor = "border-border"
-            if (currency.status === 'overdue' || healthStatus === 'critical') {
-              borderColor = "border-red-500/50"
-            } else if (currency.status === 'due' || healthStatus === 'warning') {
-              borderColor = "border-amber-500/50"
-            }
+      {/* Tab Content */}
+      {activeTab === 'match' ? (
+        <PurchaseMatchPage />
+      ) : (
+        <>
+          {/* KPI Section */}
+          <section>
+            <KPIGrid
+              totalSites={data.sites.length}
+              totalIssues={data.total_issues}
+              totalValue={data.global_value}
+            />
+          </section>
 
-            return (
-              <Card
-                key={site.site}
-                className={`overflow-hidden card-hover cursor-pointer ${borderColor} bg-card/50 animate-list-item`}
-                style={{ animationDelay: `${Math.min(index * 50, 300)}ms` }}
-                onClick={() => handleSiteClick(site.site)}
-              >
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <div className="font-medium">{formatSiteName(site.site)}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {currency.daysOld === 0 ? 'Updated today' : `Updated ${currency.daysOld} day${currency.daysOld === 1 ? '' : 's'} ago`}
+          {/* Site List */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold font-head">Sites</h2>
+              <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border">
+                {data.sites.length} Active
+              </div>
+            </div>
+            <div className="space-y-3">
+              {sortedSites.map((site: SiteSummary, index: number) => {
+                const currency = isInventoryCurrent(site.last_updated)
+                const healthStatus = site.health_status || 'clean'
+                const healthScore = site.health_score || 0
+
+                // Border color based on worst status (currency or health)
+                let borderColor = "border-border"
+                if (currency.status === 'overdue' || healthStatus === 'critical') {
+                  borderColor = "border-red-500/50"
+                } else if (currency.status === 'due' || healthStatus === 'warning') {
+                  borderColor = "border-amber-500/50"
+                }
+
+                return (
+                  <Card
+                    key={site.site}
+                    className={`overflow-hidden card-hover cursor-pointer ${borderColor} bg-card/50 animate-list-item`}
+                    style={{ animationDelay: `${Math.min(index * 50, 300)}ms` }}
+                    onClick={() => handleSiteClick(site.site)}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <div className="font-medium">{formatSiteName(site.site)}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {currency.daysOld === 0 ? 'Updated today' : `Updated ${currency.daysOld} day${currency.daysOld === 1 ? '' : 's'} ago`}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* Currency Status */}
-                    {currency.status === 'overdue' ? (
-                      <Badge variant="destructive">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Overdue
-                      </Badge>
-                    ) : currency.status === 'due' ? (
-                      <Badge variant="secondary" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Due
-                      </Badge>
-                    ) : null}
+                      <div className="flex items-center gap-3">
+                        {/* Currency Status */}
+                        {currency.status === 'overdue' ? (
+                          <Badge variant="destructive">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Overdue
+                          </Badge>
+                        ) : currency.status === 'due' ? (
+                          <Badge variant="secondary" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Due
+                          </Badge>
+                        ) : null}
 
-                    {/* Health Status */}
-                    {healthStatus === 'critical' ? (
-                      <Badge variant="destructive">
-                        {healthScore} issues
-                      </Badge>
-                    ) : healthStatus === 'warning' ? (
-                      <Badge variant="secondary" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
-                        {healthScore} issues
-                      </Badge>
-                    ) : healthStatus === 'healthy' ? (
-                      <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
-                        {healthScore} minor
-                      </Badge>
-                    ) : currency.status === 'current' ? (
-                      <Badge variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Clean
-                      </Badge>
-                    ) : null}
+                        {/* Health Status */}
+                        {healthStatus === 'critical' ? (
+                          <Badge variant="destructive">
+                            {healthScore} issues
+                          </Badge>
+                        ) : healthStatus === 'warning' ? (
+                          <Badge variant="secondary" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                            {healthScore} issues
+                          </Badge>
+                        ) : healthStatus === 'healthy' ? (
+                          <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                            {healthScore} minor
+                          </Badge>
+                        ) : currency.status === 'current' ? (
+                          <Badge variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Clean
+                          </Badge>
+                        ) : null}
 
-                    {/* Inventory Value */}
-                    <div className="text-right min-w-[100px]">
-                      <div className="text-lg font-bold font-head text-foreground">
-                        ${(site.latest_total || 0).toLocaleString()}
+                        {/* Inventory Value */}
+                        <div className="text-right min-w-[100px]">
+                          <div className="text-lg font-bold font-head text-foreground">
+                            ${(site.latest_total || 0).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">inventory value</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">inventory value</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      </section>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   )
 }

@@ -71,8 +71,8 @@ export function KPIGrid({ totalSites, totalIssues, totalValue }: KPIGridProps) {
                         <div className="p-2 rounded-lg bg-primary/10">
                             <DollarSign className="h-4 w-4 text-primary" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold font-head">{formatCurrency(totalValue)}</p>
+                        <div className="min-w-0">
+                            <p className="text-2xl font-bold font-head truncate">{formatCurrency(totalValue)}</p>
                             <p className="text-xs text-muted-foreground">Total Value</p>
                         </div>
                     </div>

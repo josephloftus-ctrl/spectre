@@ -205,8 +205,10 @@ export function RoomsPage() {
         refetch();
     }, [refetch]);
 
-    // Filter out NEVER INVENTORY room for display
-    const displayRooms = rooms.filter(r => r.name !== 'NEVER INVENTORY');
+    // Filter out NEVER INVENTORY room and sort by name
+    const displayRooms = rooms
+        .filter(r => r.name !== 'NEVER INVENTORY')
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     return (
         <div className="p-6 space-y-6">

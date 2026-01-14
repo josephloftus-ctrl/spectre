@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNotes } from '@/hooks'
 import { NotesList, NoteEditor } from '@/components/notes'
 import { Input } from '@/components/ui/input'
@@ -9,11 +9,23 @@ export function NotesPage() {
   const { notes, loading, update, remove, search } = useNotes()
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleSearch = (query: string) => {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    }
+  }, [])
+
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query)
-    search(query)
-  }
+    // Debounce search by 300ms
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    searchTimeoutRef.current = setTimeout(() => {
+      search(query)
+    }, 300)
+  }, [search])
 
   const handleUpdate = async (id: string, updates: { content?: string; tags?: string[] }) => {
     await update(id, updates)

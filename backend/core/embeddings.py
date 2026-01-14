@@ -406,6 +406,25 @@ def delete_file_embeddings(file_id: str, collection_name: str = DEFAULT_COLLECTI
         return 0
 
 
+def check_ollama_embedding() -> Dict[str, Any]:
+    """Quick check if Ollama embedding model is available."""
+    try:
+        response = requests.post(
+            f"{settings.OLLAMA_URL}/api/embeddings",
+            json={"model": settings.EMBED_MODEL, "prompt": "test"},
+            timeout=5
+        )
+        if response.status_code == 200:
+            return {"available": True}
+        return {"available": False, "error": f"Ollama returned status {response.status_code}"}
+    except requests.exceptions.ConnectionError:
+        return {"available": False, "error": f"Cannot connect to Ollama at {settings.OLLAMA_URL}"}
+    except requests.exceptions.Timeout:
+        return {"available": False, "error": "Ollama request timed out"}
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
 def get_embedding_stats(collection_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Get embedding statistics.
@@ -414,6 +433,16 @@ def get_embedding_stats(collection_name: Optional[str] = None) -> Dict[str, Any]
         collection_name: Specific collection, or None for all collections
     """
     from .collections import list_collections
+
+    # First check if Ollama is available
+    ollama_check = check_ollama_embedding()
+    if not ollama_check.get("available"):
+        return {
+            "available": False,
+            "error": ollama_check.get("error", "Ollama not available"),
+            "model": settings.EMBED_MODEL,
+            "ollama_url": settings.OLLAMA_URL
+        }
 
     if collection_name:
         collection = get_collection(collection_name)

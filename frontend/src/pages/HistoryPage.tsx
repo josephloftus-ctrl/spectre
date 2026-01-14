@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Loader2, TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown,
-  Plus, MinusCircle, DollarSign, Package, AlertTriangle, ChevronDown
+  Plus, MinusCircle, DollarSign, Package, AlertTriangle, ChevronDown,
+  Calendar
 } from 'lucide-react'
 import {
   fetchSites, fetchSiteHistory, fetchSiteMovers, fetchSiteAnomalies,
@@ -11,6 +12,51 @@ import {
   formatSiteName
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
+
+// Helper to get ISO week number
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+// Helper to get week label
+function getWeekLabel(date: Date): string {
+  const now = new Date()
+  const weekNum = getWeekNumber(date)
+  const currentWeek = getWeekNumber(now)
+  const year = date.getFullYear()
+  const currentYear = now.getFullYear()
+
+  if (year === currentYear && weekNum === currentWeek) {
+    return 'This Week'
+  } else if (year === currentYear && weekNum === currentWeek - 1) {
+    return 'Last Week'
+  } else {
+    // Get the Monday of this week for the date range
+    const monday = new Date(date)
+    monday.setDate(date.getDate() - (date.getDay() || 7) + 1)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+
+    const formatDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${formatDate(monday)} - ${formatDate(sunday)}`
+  }
+}
+
+interface WeekGroup {
+  weekKey: string
+  label: string
+  entries: Array<{
+    snapshot_date: string
+    total_value: number
+    item_flag_count: number
+    score: number
+    status: string
+  }>
+}
 
 type TimeRange = 7 | 30 | 90
 
@@ -120,6 +166,109 @@ function AnomalyRow({ item, type }: AnomalyRowProps) {
   )
 }
 
+// Group history entries by week
+function groupByWeek(entries: SiteHistory['history']): WeekGroup[] {
+  const groups = new Map<string, WeekGroup>()
+
+  for (const entry of entries) {
+    const date = new Date(entry.snapshot_date)
+    const year = date.getFullYear()
+    const week = getWeekNumber(date)
+    const weekKey = `${year}-W${week.toString().padStart(2, '0')}`
+
+    if (!groups.has(weekKey)) {
+      groups.set(weekKey, {
+        weekKey,
+        label: getWeekLabel(date),
+        entries: []
+      })
+    }
+    groups.get(weekKey)!.entries.push(entry)
+  }
+
+  // Sort groups by weekKey descending (newest first)
+  return Array.from(groups.values()).sort((a, b) => b.weekKey.localeCompare(a.weekKey))
+}
+
+interface HistoryTimelineProps {
+  weekGroups: WeekGroup[]
+  formatCurrency: (value: number) => string
+}
+
+function HistoryTimeline({ weekGroups, formatCurrency }: HistoryTimelineProps) {
+  if (weekGroups.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Weekly History
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">Inventory snapshots by week</p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {weekGroups.map((group) => (
+            <div key={group.weekKey}>
+              {/* Week header */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-medium text-muted-foreground px-2 bg-background">
+                  {group.label}
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* Entries for this week */}
+              <div className="space-y-2 pl-4 border-l-2 border-muted">
+                {group.entries.map((entry, idx) => {
+                  const date = new Date(entry.snapshot_date)
+                  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+                  const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+                  return (
+                    <div
+                      key={`${entry.snapshot_date}-${idx}`}
+                      className="flex items-center gap-3 py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="text-xs text-muted-foreground w-16">
+                        <span className="font-medium">{dayName}</span>
+                        <br />
+                        {dateStr}
+                      </div>
+                      <div className="flex-1 flex items-center gap-4">
+                        <div>
+                          <p className="text-sm font-medium">{formatCurrency(entry.total_value)}</p>
+                          <p className="text-xs text-muted-foreground">Total Value</p>
+                        </div>
+                        {entry.item_flag_count > 0 && (
+                          <div className="flex items-center gap-1 text-amber-500">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span className="text-xs">{entry.item_flag_count} flags</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className={cn(
+                        "text-xs px-2 py-0.5 rounded-full",
+                        entry.status === 'good' && "bg-emerald-100 text-emerald-700",
+                        entry.status === 'warning' && "bg-amber-100 text-amber-700",
+                        entry.status === 'critical' && "bg-red-100 text-red-700"
+                      )}>
+                        {entry.status}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function HistoryPage() {
   const [sites, setSites] = useState<string[]>([])
   const [selectedSite, setSelectedSite] = useState<string>('')
@@ -179,6 +328,12 @@ export function HistoryPage() {
       maximumFractionDigits: 0
     }).format(value)
   }
+
+  // Group history by week
+  const weekGroups = useMemo(() => {
+    if (!history?.history) return []
+    return groupByWeek(history.history)
+  }, [history?.history])
 
   return (
     <div className="space-y-6">
@@ -262,8 +417,10 @@ export function HistoryPage() {
             />
           </div>
 
-          {/* History note */}
-          {history.history.length === 0 && (
+          {/* Weekly History Timeline */}
+          {weekGroups.length > 0 ? (
+            <HistoryTimeline weekGroups={weekGroups} formatCurrency={formatCurrency} />
+          ) : (
             <Card className="border-dashed">
               <CardContent className="py-6 text-center text-muted-foreground">
                 <p>No historical data yet. History will build up over time as more inventory files are processed.</p>

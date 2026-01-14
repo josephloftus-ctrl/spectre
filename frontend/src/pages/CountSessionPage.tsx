@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   ClipboardList, Loader2, Trash2, Download, Plus, RefreshCw, AlertCircle,
-  ChevronRight, Check, X, Package, ArrowLeft, FileSpreadsheet
+  ChevronRight, Check, X, Package, ArrowLeft, FileSpreadsheet, MapPin
 } from 'lucide-react'
 import {
   fetchCountSessions, fetchCountSession, createCountSession, updateCountSession,
@@ -78,14 +78,58 @@ function SessionRow({ session, onClick }: SessionRowProps) {
   )
 }
 
-// Count item row
+// Count item row with inline editing
 interface CountItemRowProps {
   item: CountItem
+  sessionId: string
+  isActive: boolean
+  onUpdate: () => void
 }
 
-function CountItemRow({ item }: CountItemRowProps) {
+function CountItemRow({ item, sessionId, isActive, onUpdate }: CountItemRowProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(item.counted_qty.toString())
+  const [saving, setSaving] = useState(false)
+  const inputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) node.select()
+  }, [])
+
   const hasVariance = item.variance !== null && item.variance !== 0
   const total = item.counted_qty * (item.unit_price || 0)
+
+  const handleSave = async () => {
+    const newQty = parseFloat(editValue)
+    if (isNaN(newQty) || newQty === item.counted_qty) {
+      setIsEditing(false)
+      setEditValue(item.counted_qty.toString())
+      return
+    }
+
+    try {
+      setSaving(true)
+      await addCountItem(sessionId, {
+        sku: item.sku,
+        description: item.description,
+        counted_qty: newQty
+      })
+      onUpdate()
+      setIsEditing(false)
+    } catch (error) {
+      console.error('Failed to update count:', error)
+      setEditValue(item.counted_qty.toString())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setIsEditing(false)
+      setEditValue(item.counted_qty.toString())
+    }
+  }
 
   return (
     <div className={cn(
@@ -108,8 +152,35 @@ function CountItemRow({ item }: CountItemRowProps) {
         </div>
       </div>
 
-      <div className="text-right">
-        <p className="font-mono font-medium">{item.counted_qty} {item.uom || ''}</p>
+      <div className="text-right min-w-[100px]">
+        {isEditing ? (
+          <div className="flex items-center gap-1">
+            <Input
+              ref={inputRef}
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={handleSave}
+              onKeyDown={handleKeyDown}
+              className="w-20 h-8 text-right font-mono"
+              disabled={saving}
+              autoFocus
+            />
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          </div>
+        ) : (
+          <button
+            onClick={() => isActive && setIsEditing(true)}
+            disabled={!isActive}
+            className={cn(
+              "font-mono font-medium text-right",
+              isActive && "hover:bg-accent hover:text-accent-foreground px-2 py-1 rounded cursor-pointer"
+            )}
+            title={isActive ? "Click to edit" : "Session not active"}
+          >
+            {item.counted_qty} {item.uom || ''}
+          </button>
+        )}
         {item.expected_qty !== null && (
           <p className="text-xs text-muted-foreground">
             Expected: {item.expected_qty}
@@ -217,6 +288,34 @@ export function CountSessionPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [populating, setPopulating] = useState(false)
+
+  // Group items by location for visual separation
+  const itemsByLocation = useMemo(() => {
+    const groups = new Map<string, CountItem[]>()
+    const locationOrder = [
+      'Freezer', 'Walk In Cooler', 'Beverage Room',
+      'Dry Storage Food', 'Dry Storage Supplies', 'Chemical Locker',
+      'UNASSIGNED'
+    ]
+
+    for (const item of sessionItems) {
+      const location = item.location || 'UNASSIGNED'
+      if (!groups.has(location)) {
+        groups.set(location, [])
+      }
+      groups.get(location)!.push(item)
+    }
+
+    // Sort groups by predefined order, then alphabetically for unknown locations
+    return Array.from(groups.entries()).sort((a, b) => {
+      const aIdx = locationOrder.indexOf(a[0])
+      const bIdx = locationOrder.indexOf(b[0])
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+      if (aIdx !== -1) return -1
+      if (bIdx !== -1) return 1
+      return a[0].localeCompare(b[0])
+    })
+  }, [sessionItems])
 
   // Load available sites
   useEffect(() => {
@@ -481,9 +580,31 @@ export function CountSessionPage() {
             )}
           </Card>
         ) : (
-          <div className="space-y-2">
-            {sessionItems.map(item => (
-              <CountItemRow key={item.id} item={item} />
+          <div className="space-y-6">
+            {itemsByLocation.map(([location, items]) => (
+              <div key={location}>
+                {/* Location header */}
+                <div className="flex items-center gap-2 mb-3 sticky top-0 bg-background py-2 z-10">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-medium text-sm">{location}</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {items.length} item{items.length !== 1 ? 's' : ''}
+                  </Badge>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                {/* Items in this location */}
+                <div className="space-y-2 pl-6 border-l-2 border-muted ml-2">
+                  {items.map(item => (
+                    <CountItemRow
+                      key={item.id}
+                      item={item}
+                      sessionId={selectedSession.id}
+                      isActive={selectedSession.status === 'active'}
+                      onUpdate={loadSessionDetails}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
