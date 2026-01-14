@@ -1,0 +1,6 @@
+Specter 1-11
+	⁃	Notrs feature not working properly build proper notes feature tries to sync as you type causing keyboard to acting funk 
+	⁃	Implement inventory count sheet cleaner with confidence score 
+	⁃	Implement off catalog item builder with universal off catalog standard and workflow (need to determine source of Pepsi/coke invoices and other off catalog hotspots supply America  quick pick containers?) 
+	⁃	Need a better idea of what these categories are meant to be doesn't seem to be congruent between descriptions
+	⁃	

@@ -1,0 +1,12 @@
+Spectre 1/13
+
+
+AI training search not working 
+Front page tabs should connect to purchase matching inventory tab should be consolidated with the front page purchase match most important history necessary for looking back to previous weeks 
+Date needs to be more clear for this week when we have clear separation of weeks and not just aggregate data 
+Rooms function working kinda but sort needs some love 
+Need to verify xlsx outputs for upload 
+Inventory count entry text box not working 
+Want visual separation of rooms in inventory maybe even combine rooms and count into a single view with a selector 
+Total value is sticking out of the text box on the front page 
+

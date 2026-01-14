@@ -1,0 +1,1 @@
+FROM ./Qwen3-Embedding-4B-iq3_xs.gguf

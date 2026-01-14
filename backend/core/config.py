@@ -22,7 +22,7 @@ class Settings:
     # CORS - comma-separated list of allowed origins
     ALLOWED_ORIGINS: list = os.environ.get(
         "ALLOWED_ORIGINS",
-        "http://localhost:8090,http://localhost:5173,http://127.0.0.1:8090"
+        "http://localhost:8090,http://localhost:5173,http://127.0.0.1:8090,https://steady.josephloftus.com"
     ).split(",")
 
     # Database

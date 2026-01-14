@@ -35,7 +35,7 @@ def normalize_inventory_row(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             continue
         key_lower = key.lower().strip()
 
-        if "sku" in key_lower or "item #" in key_lower or "item number" in key_lower or key_lower == "item":
+        if "sku" in key_lower or "item #" in key_lower or "item number" in key_lower or key_lower == "item" or "dist #" in key_lower or key_lower == "dist":
             item["sku"] = str(value).strip() if value else ""
         elif "description" in key_lower or "item name" in key_lower:
             item["description"] = str(value).strip() if value else ""
