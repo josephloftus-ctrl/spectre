@@ -1,0 +1,39 @@
+# Theme definitions by month
+# Each theme has dates, window (days before valid), and keywords
+
+2026-02:
+  super-bowl:
+    name: "Super Bowl"
+    dates: ["2026-02-08", "2026-02-09"]
+    window: 1
+    keywords: ["super bowl", "game day", "tailgate", "football"]
+
+  mardi-gras:
+    name: "Mardi Gras"
+    dates: ["2026-02-17"]
+    window: 3
+    keywords: ["mardi gras", "cajun", "creole", "new orleans"]
+
+  valentines:
+    name: "Valentine's Day"
+    dates: ["2026-02-14"]
+    window: 1
+    keywords: ["valentine", "heart", "love"]
+
+  fish-friday:
+    name: "Fish Friday"
+    dates: ["2026-02-06", "2026-02-13", "2026-02-20", "2026-02-27"]
+    window: 0
+    keywords: ["fish", "seafood", "cod", "shrimp", "salmon"]
+
+  black-history-month:
+    name: "Black History Month"
+    dates: ["2026-02-03", "2026-02-10", "2026-02-17", "2026-02-24"]
+    window: 1
+    keywords: ["black history", "soul food", "southern"]
+
+  heart-healthy:
+    name: "Wellness - Heart Healthy"
+    dates: ["2026-02-04", "2026-02-11", "2026-02-18", "2026-02-25"]
+    window: 1
+    keywords: ["wellness", "heart healthy", "healthy"]
