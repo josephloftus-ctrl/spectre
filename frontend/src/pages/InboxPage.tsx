@@ -23,7 +23,8 @@ const STATUS_CONFIG = {
 }
 
 export function InboxPage() {
-  const [files, setFiles] = useState<InboxFile[]>([])
+  // TODO: Connect to real file upload API
+  const files: InboxFile[] = []
   const [selectedFile, setSelectedFile] = useState<InboxFile | null>(null)
 
   return (

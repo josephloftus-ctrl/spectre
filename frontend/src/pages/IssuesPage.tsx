@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { AlertTriangle, TrendingUp, DollarSign, Calendar } from 'lucide-react'
+import { AlertTriangle, TrendingUp, DollarSign } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
@@ -15,8 +14,8 @@ interface Issue {
 }
 
 export function IssuesPage() {
-  const [issues, setIssues] = useState<Issue[]>([])
-  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
+  // TODO: Connect to real issues API
+  const issues: Issue[] = []
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -89,7 +88,7 @@ export function IssuesPage() {
           issues.map((issue) => (
             <button
               key={issue.id}
-              onClick={() => setSelectedIssue(issue)}
+              onClick={() => console.log('Selected issue:', issue.id)}
               className="w-full p-4 text-left hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-start justify-between gap-4">
