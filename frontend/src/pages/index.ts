@@ -13,6 +13,7 @@ export { CartPage } from './CartPage'
 export { CountSessionPage } from './CountSessionPage'
 export { OffCatalogPage } from './OffCatalogPage'
 export { RoomsPage } from './RoomsPage'
+export { IssuesPage } from './IssuesPage'
 
 // Legacy exports for internal use by InventoryPage
 export { ScoresPage } from './ScoresPage'
