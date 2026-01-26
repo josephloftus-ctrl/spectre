@@ -1,299 +1,124 @@
-import { useState, useCallback, useEffect } from 'react'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { useState } from 'react'
+import { Upload, FileText, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { FolderOpen, RefreshCw, Unplug, FileSpreadsheet, Radio, Book, Utensils, Brain } from 'lucide-react'
-import { DropZone, FileCard, FileStatus } from '@/components/inbox'
-import { useFolderPicker } from '@/hooks'
-import { uploadFile, fetchCollections, CollectionInfo } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
 
-const COLLECTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  knowledge_base: Book,
-  food_knowledge: Utensils,
-  living_memory: Brain,
-}
+// Status types for files
+type FileStatus = 'pending' | 'processing' | 'needs_review' | 'complete'
 
-interface PendingFile {
+interface InboxFile {
   id: string
-  file: File
+  name: string
   status: FileStatus
-  errorMessage?: string
-  backendId?: string  // ID from backend after upload
+  uploadedAt: Date
+  detectedDate?: string
+  confidence?: 'high' | 'low'
 }
 
-function getFileType(filename: string): 'xlsx' | 'xls' | 'pdf' | 'csv' {
-  const ext = filename.split('.').pop()?.toLowerCase()
-  if (ext === 'xlsx') return 'xlsx'
-  if (ext === 'xls') return 'xls'
-  if (ext === 'pdf') return 'pdf'
-  return 'csv'
+const STATUS_CONFIG = {
+  pending: { icon: Clock, label: 'Pending', className: 'text-muted-foreground' },
+  processing: { icon: Clock, label: 'Processing', className: 'text-primary animate-pulse' },
+  needs_review: { icon: AlertCircle, label: 'Needs Review', className: 'text-warning' },
+  complete: { icon: CheckCircle, label: 'Complete', className: 'text-success' },
 }
 
 export function InboxPage() {
-  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
-  const [collections, setCollections] = useState<CollectionInfo[]>([])
-  const [selectedCollection, setSelectedCollection] = useState('knowledge_base')
-
-  useEffect(() => {
-    fetchCollections()
-      .then(({ collections }) => setCollections(collections))
-      .catch(console.error)
-  }, [])
-
-  const handleFilesDropped = useCallback((files: File[]) => {
-    const newFiles: PendingFile[] = files.map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      status: 'pending' as FileStatus
-    }))
-    setPendingFiles(prev => [...newFiles, ...prev])
-  }, [])
-
-  const {
-    isSupported: isFolderPickerSupported,
-    isConnected,
-    folderName,
-    isScanning,
-    autoScanEnabled,
-    pickFolder,
-    disconnect,
-    scanFolder,
-    toggleAutoScan
-  } = useFolderPicker(handleFilesDropped)
-
-  const handleScanFolder = useCallback(async () => {
-    try {
-      await scanFolder(false)
-    } catch (e) {
-      console.error('Scan failed:', e)
-    }
-  }, [scanFolder])
-
-  const handleRemoveFile = useCallback((id: string) => {
-    setPendingFiles(prev => prev.filter(f => f.id !== id))
-  }, [])
-
-  const handleProcessFile = useCallback(async (id: string) => {
-    const pendingFile = pendingFiles.find(f => f.id === id)
-    if (!pendingFile) return
-
-    setPendingFiles(prev =>
-      prev.map(f => f.id === id ? { ...f, status: 'processing' as FileStatus } : f)
-    )
-
-    try {
-      const fileRecord = await uploadFile(pendingFile.file)
-
-      // Map backend status to UI status
-      const uiStatus: FileStatus =
-        fileRecord.status === 'completed' ? 'ready' :
-        fileRecord.status === 'failed' ? 'error' :
-        fileRecord.status === 'processing' ? 'processing' : 'ready'
-
-      setPendingFiles(prev =>
-        prev.map(f => f.id === id ? {
-          ...f,
-          status: uiStatus,
-          backendId: fileRecord.id,
-          errorMessage: fileRecord.error_message || undefined
-        } : f)
-      )
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Upload failed'
-      setPendingFiles(prev =>
-        prev.map(f => f.id === id ? {
-          ...f,
-          status: 'error' as FileStatus,
-          errorMessage
-        } : f)
-      )
-    }
-  }, [pendingFiles])
-
-  const handleProcessAll = useCallback(async () => {
-    const pending = pendingFiles.filter(f => f.status === 'pending')
-    for (const file of pending) {
-      await handleProcessFile(file.id)
-    }
-  }, [pendingFiles, handleProcessFile])
-
-  const pendingCount = pendingFiles.filter(f => f.status === 'pending').length
+  const [files, setFiles] = useState<InboxFile[]>([])
+  const [selectedFile, setSelectedFile] = useState<InboxFile | null>(null)
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="h-[calc(100vh-7rem)]">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold font-head">Inbox</h1>
-          <p className="text-muted-foreground">
-            Drop files or connect a synced folder
-          </p>
+          <h1 className="text-2xl font-semibold">Inbox</h1>
+          <p className="text-muted-foreground">Upload and validate files before processing</p>
         </div>
-        {pendingCount > 0 && (
-          <Button onClick={handleProcessAll}>
-            Process All ({pendingCount})
-          </Button>
-        )}
+        <Button className="gap-2">
+          <Upload className="h-4 w-4" />
+          Upload Files
+        </Button>
       </div>
 
-      {/* Collection Selector */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Upload To Collection</CardTitle>
-          <CardDescription>
-            Select which knowledge base to add files to
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {collections.map((coll) => {
-              const Icon = COLLECTION_ICONS[coll.name] || FileSpreadsheet
-              return (
-                <button
-                  key={coll.name}
-                  onClick={() => setSelectedCollection(coll.name)}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-colors",
-                    selectedCollection === coll.name
-                      ? "border-primary bg-primary/5"
-                      : "border-muted hover:border-muted-foreground/30"
-                  )}
-                >
-                  <Icon className={cn("h-5 w-5", selectedCollection === coll.name ? "text-primary" : "text-muted-foreground")} />
-                  <div className="text-left">
-                    <div className={cn("font-medium text-sm", selectedCollection === coll.name ? "text-primary" : "")}>
-                      {coll.name.replace(/_/g, ' ')}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {coll.chunk_count} chunks
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100%-5rem)]">
+        {/* File Queue */}
+        <Card className="p-4 overflow-hidden flex flex-col">
+          <h2 className="font-medium mb-4">File Queue</h2>
 
-      {/* Folder Connection */}
-      {isFolderPickerSupported && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <FolderOpen className="h-4 w-4" />
-              Synced Folder
-            </CardTitle>
-            <CardDescription>
-              Connect to your OneDrive sync folder for quick imports
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isConnected ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <FolderOpen className="h-5 w-5 text-primary" />
+          {files.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <FileText className="h-12 w-12 mb-4 opacity-50" />
+              <p>No files in queue</p>
+              <p className="text-sm">Upload files to get started</p>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {files.map((file) => {
+                const statusConfig = STATUS_CONFIG[file.status]
+                const StatusIcon = statusConfig.icon
+                return (
+                  <button
+                    key={file.id}
+                    onClick={() => setSelectedFile(file)}
+                    className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                      selectedFile?.id === file.id
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {file.detectedDate || 'Processing...'}
+                        </p>
+                      </div>
+                      <StatusIcon className={`h-5 w-5 ${statusConfig.className}`} />
                     </div>
-                    <div>
-                      <p className="font-medium">{folderName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {autoScanEnabled ? (
-                          <span className="flex items-center gap-1">
-                            <Radio className="h-3 w-3 text-primary animate-pulse" />
-                            Auto-watching for new files
-                          </span>
-                        ) : (
-                          'Connected'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant={autoScanEnabled ? "secondary" : "outline"}
-                      size="sm"
-                      onClick={toggleAutoScan}
-                    >
-                      <Radio className={`h-4 w-4 mr-2 ${autoScanEnabled ? 'text-primary' : ''}`} />
-                      {autoScanEnabled ? 'Auto' : 'Manual'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleScanFolder}
-                      disabled={isScanning}
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${isScanning ? 'animate-spin' : ''}`} />
-                      {isScanning ? 'Scanning...' : 'Scan'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={disconnect}
-                    >
-                      <Unplug className="h-4 w-4" />
-                    </Button>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* Preview Pane */}
+        <Card className="p-4 overflow-hidden flex flex-col">
+          <h2 className="font-medium mb-4">Preview</h2>
+
+          {!selectedFile ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <p>Select a file to preview</p>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm text-muted-foreground">File Name</label>
+                  <p className="font-medium">{selectedFile.name}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm text-muted-foreground">Detected Date</label>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{selectedFile.detectedDate || '—'}</p>
+                    {selectedFile.confidence === 'low' && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-warning/10 text-warning">
+                        Please verify
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                <div className="pt-4 flex gap-2">
+                  <Button className="flex-1">Accept</Button>
+                  <Button variant="outline" className="flex-1">Override Date</Button>
+                </div>
               </div>
-            ) : (
-              <Button variant="outline" onClick={pickFolder}>
-                <FolderOpen className="h-4 w-4 mr-2" />
-                Connect Folder
-              </Button>
-            )}
-          </CardContent>
+            </div>
+          )}
         </Card>
-      )}
-
-      {/* Drop Zone */}
-      <DropZone onFilesDropped={handleFilesDropped} />
-
-      {/* Pending Files */}
-      {pendingFiles.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Files ({pendingFiles.length})</h2>
-            {pendingFiles.some(f => f.status === 'ready') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPendingFiles(prev => prev.filter(f => f.status !== 'ready'))}
-              >
-                Clear completed
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            {pendingFiles.map(pf => (
-              <FileCard
-                key={pf.id}
-                filename={pf.file.name}
-                fileType={getFileType(pf.file.name)}
-                fileSize={pf.file.size}
-                status={pf.status}
-                errorMessage={pf.errorMessage}
-                onProcess={pf.status === 'pending' ? () => handleProcessFile(pf.id) : undefined}
-                onRemove={() => handleRemoveFile(pf.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {pendingFiles.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground">
-              No files yet. Drop Excel or PDF files above, or connect a synced folder.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      </div>
     </div>
   )
 }
