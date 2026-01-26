@@ -358,7 +358,7 @@ export const runCleanup = async (days: number = 30): Promise<{ success: boolean;
 
 export type ScoreStatus = 'critical' | 'warning' | 'healthy' | 'clean';
 export type TrendType = 'up' | 'down' | 'stable' | null;
-export type FlagType = 'uom_error' | 'big_dollar';
+export type FlagType = 'uom_error' | 'big_dollar' | 'flagged_distributor';
 
 export interface SourceFile {
     id: string;

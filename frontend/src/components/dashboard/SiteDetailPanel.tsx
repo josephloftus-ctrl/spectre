@@ -7,7 +7,6 @@ import {
   fetchSiteFiles,
   type UnitScoreDetail,
   type FileRecord,
-  type FlagType,
   formatSiteName,
 } from '@/lib/api'
 import {
@@ -21,10 +20,13 @@ interface SiteDetailPanelProps {
   siteId: string
 }
 
-const FLAG_LABELS: Record<FlagType, { label: string; className: string }> = {
+const FLAG_LABELS: Record<string, { label: string; className: string }> = {
   uom_error: { label: 'UOM Error', className: 'bg-warning/10 text-warning border-warning/20' },
   big_dollar: { label: 'High Value', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  flagged_distributor: { label: 'Distributor', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
 }
+
+const DEFAULT_FLAG = { label: 'Flag', className: 'bg-muted text-muted-foreground' }
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -149,7 +151,7 @@ export function SiteDetailPanel({ siteId }: SiteDetailPanelProps) {
                     <p className="font-medium text-sm truncate">{item.item}</p>
                     <div className="flex items-center gap-1 mt-1 flex-wrap">
                       {item.flags.map(flag => {
-                        const config = FLAG_LABELS[flag]
+                        const config = FLAG_LABELS[flag] || DEFAULT_FLAG
                         return (
                           <Badge
                             key={flag}
