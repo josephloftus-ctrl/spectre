@@ -5,7 +5,7 @@ import { RefreshCw, Loader2, Camera, AlertTriangle, DollarSign, Building2 } from
 import { fetchScores, refreshScores, createScoreSnapshot, UnitScore, ScoreStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getStatusLabel } from '@/components/ui/status-indicator'
-import { SiteCard } from '@/components/dashboard/SiteCard'
+import { SiteCard, SiteDetailPanel } from '@/components/dashboard'
 import { useContextPanel } from '@/components/layout'
 
 type FilterStatus = ScoreStatus | 'all'
@@ -71,15 +71,7 @@ export function InventoryPage() {
 
   const handleSiteClick = (siteId: string) => {
     setSelectedSiteId(siteId)
-    // Context panel content will be implemented in Task 3
-    contextPanel.open(
-      <div className="p-4">
-        <p className="text-muted-foreground">Site details for {siteId}</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          (Full panel coming in next update)
-        </p>
-      </div>
-    )
+    contextPanel.open(<SiteDetailPanel siteId={siteId} />)
   }
 
   // Calculate stats
