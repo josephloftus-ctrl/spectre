@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { CommandBar } from '@/components/command'
 import {
-  InboxPage, IssuesPage, InventoryPage,
+  DashboardPage, InboxPage, IssuesPage, InventoryPage,
   NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage,
   PurchaseMatchDetailPage, PurchaseMatchCategoryPage,
   CartPage, CountSessionPage, OffCatalogPage, RoomsPage
@@ -15,7 +15,7 @@ function App() {
       <AppShell>
         <Routes>
           {/* Main Views */}
-          <Route path="/" element={<Navigate to="/inbox" replace />} />
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/issues" element={<IssuesPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
@@ -36,6 +36,7 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
 
           {/* Legacy redirects */}
+          <Route path="/dashboard" element={<Navigate to="/" replace />} />
           <Route path="/documents" element={<Navigate to="/inbox" replace />} />
           <Route path="/scores" element={<Navigate to="/inventory" replace />} />
           <Route path="/history" element={<Navigate to="/inventory" replace />} />
