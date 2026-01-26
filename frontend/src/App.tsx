@@ -1,54 +1,57 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { DashboardPage, DocumentsPage, NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage, InventoryPage, PurchaseMatchDetailPage, PurchaseMatchCategoryPage, CartPage, CountSessionPage, OffCatalogPage, RoomsPage } from '@/pages'
+import { AppShell } from '@/components/layout/AppShell'
+import { CommandBar } from '@/components/command'
+import {
+  InboxPage, IssuesPage, InventoryPage,
+  NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage,
+  PurchaseMatchDetailPage, PurchaseMatchCategoryPage,
+  CartPage, CountSessionPage, OffCatalogPage, RoomsPage
+} from '@/pages'
 
 function App() {
   return (
-    <DashboardLayout>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
+    <>
+      <CommandBar />
+      <AppShell>
+        <Routes>
+          {/* Main Views */}
+          <Route path="/" element={<Navigate to="/inbox" replace />} />
+          <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/issues" element={<IssuesPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
 
-        {/* Inventory - consolidated view with tabs */}
-        <Route path="/inventory" element={<InventoryPage />} />
-        <Route path="/inventory/site/:siteId" element={<SitePage />} />
-        <Route path="/inventory/match/:unit" element={<PurchaseMatchDetailPage />} />
-        <Route path="/inventory/match/category/:category" element={<PurchaseMatchCategoryPage />} />
+          {/* Inventory sub-routes */}
+          <Route path="/inventory/site/:siteId" element={<SitePage />} />
+          <Route path="/inventory/match/:unit" element={<PurchaseMatchDetailPage />} />
+          <Route path="/inventory/match/category/:category" element={<PurchaseMatchCategoryPage />} />
 
-        {/* Redirects for old routes */}
-        <Route path="/scores" element={<Navigate to="/inventory?tab=health" replace />} />
-        <Route path="/history" element={<Navigate to="/inventory?tab=history" replace />} />
-        <Route path="/purchase-match" element={<Navigate to="/inventory?tab=match" replace />} />
-        <Route path="/purchase-match/category/:category" element={<Navigate to="/inventory/match/category/:category" replace />} />
-        <Route path="/purchase-match/:unit" element={<Navigate to="/inventory/match/:unit" replace />} />
-        <Route path="/system" element={<Navigate to="/settings?debug=1" replace />} />
+          {/* Utility pages */}
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/count" element={<CountSessionPage />} />
+          <Route path="/off-catalog" element={<OffCatalogPage />} />
+          <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/notes" element={<NotesPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
 
-        {/* Legacy site routes - redirect to new location */}
-        <Route path="/site/:siteId" element={<SitePage />} />
-        <Route path="/:siteId" element={<SitePage />} />
+          {/* Legacy redirects */}
+          <Route path="/documents" element={<Navigate to="/inbox" replace />} />
+          <Route path="/scores" element={<Navigate to="/inventory?tab=health" replace />} />
+          <Route path="/history" element={<Navigate to="/inventory?tab=history" replace />} />
+          <Route path="/purchase-match" element={<Navigate to="/inventory?tab=match" replace />} />
+          <Route path="/collections" element={<Navigate to="/search?tab=collections" replace />} />
+          <Route path="/ai" element={<Navigate to="/assistant" replace />} />
+          <Route path="/standup" element={<Navigate to="/assistant" replace />} />
+          <Route path="/glance" element={<Navigate to="/issues" replace />} />
+          <Route path="/system" element={<Navigate to="/settings?debug=1" replace />} />
 
-        {/* Cart, Count Sessions, Off-Catalog, Rooms */}
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/count" element={<CountSessionPage />} />
-        <Route path="/off-catalog" element={<OffCatalogPage />} />
-        <Route path="/rooms" element={<RoomsPage />} />
-
-        {/* Standard pages */}
-        <Route path="/documents" element={<DocumentsPage />} />
-        <Route path="/inbox" element={<Navigate to="/documents?tab=upload" replace />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/notes" element={<NotesPage />} />
-        <Route path="/assistant" element={<AssistantPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-
-        {/* Redirect for consolidated pages */}
-        <Route path="/collections" element={<Navigate to="/search?tab=collections" replace />} />
-
-        {/* Redirects for consolidated pages */}
-        <Route path="/ai" element={<Navigate to="/assistant" replace />} />
-        <Route path="/standup" element={<Navigate to="/assistant" replace />} />
-        <Route path="/glance" element={<Navigate to="/" replace />} />
-      </Routes>
-    </DashboardLayout>
+          {/* Legacy site routes */}
+          <Route path="/site/:siteId" element={<SitePage />} />
+          <Route path="/:siteId" element={<SitePage />} />
+        </Routes>
+      </AppShell>
+    </>
   )
 }
 
