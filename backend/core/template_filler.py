@@ -95,11 +95,9 @@ FIELD_FALLBACKS = {
     'Units Per Case': ['units_per_case'],
 }
 
-# Columns that should be numeric (for type coercion)
-NUMERIC_COLUMNS = {
-    'Quantity', 'Break Quantity', 'Price', 'Break Price',
-    'Catch Weight', 'Average Weight', 'Units Per Case'
-}
+# NOTE: Reference templates store ALL values as strings, including prices with $
+# We should NOT coerce to native types - preserve string format exactly
+# This was the bug: converting '$53.35' -> 53.35 breaks MyOrders compatibility
 
 
 class TemplateFiller:
@@ -244,36 +242,25 @@ class TemplateFiller:
 
     def _coerce_value(self, value: Any, field_name: str) -> Any:
         """
-        Force correct data types for OrderMaestro validation.
+        Preserve values as strings for OrderMaestro compatibility.
 
-        Numeric fields should be actual numbers, not strings.
+        Reference templates store ALL values as strings, including:
+        - Prices with $ symbol: '$53.35'
+        - Numeric quantities: '24'
+        - Decimal values: '0.00'
+
+        We must NOT convert to native Python types or strip formatting.
         """
         if value is None:
             return None
 
-        # Numeric columns should be actual numbers
-        if field_name in NUMERIC_COLUMNS:
-            if isinstance(value, (int, float)):
-                return value
-            try:
-                # Try to parse as number
-                str_val = str(value).strip()
-                if not str_val:
-                    return None
-                # Remove currency symbols and commas
-                str_val = str_val.replace('$', '').replace(',', '')
-                if '.' in str_val:
-                    return float(str_val)
-                return int(str_val)
-            except (ValueError, TypeError):
-                # If can't convert, return as-is
-                return value
+        # Return as string, preserving original format
+        if isinstance(value, str):
+            return value
 
-        # Text columns - return as string if not None
-        if value is not None:
-            return str(value) if not isinstance(value, str) else value
-
-        return value
+        # Convert non-strings to string representation
+        # This handles numeric inputs from our internal data
+        return str(value)
 
     def _save_to_buffer(self) -> BytesIO:
         """Save workbook to BytesIO buffer."""

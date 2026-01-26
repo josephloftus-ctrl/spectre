@@ -67,23 +67,12 @@ spectre/
 
 ---
 
-## Known Issues
+## Recent Completions
 
-See CODE_REVIEW.md for full security/quality review. Key items:
-
-- CORS allows all origins (needs restriction for production)
-- No authentication on API endpoints
-- Memory importance hardcoded to 4
-
----
-
-## Phase 6 TODO: UI Polish
-
-- [ ] Message markdown rendering
-- [ ] Code syntax highlighting
-- [ ] File attachment in chat
-- [ ] Model selector in chat header
-- [ ] Conversation search
-- [ ] Export chat as PDF/markdown
-- [ ] Dark/light theme toggle
-- [ ] Mobile-responsive improvements
+- Markdown rendering with syntax highlighting (Prism)
+- Dark/light theme toggle
+- CORS restricted to allowed origins via `settings.ALLOWED_ORIGINS`
+- Centralized configuration (`backend/core/config.py`)
+- Room-based inventory categorization
+- Plugin system for client-specific configurations
+- Template-filling export for OrderMaestro compatibility

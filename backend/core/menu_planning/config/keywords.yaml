@@ -1,0 +1,40 @@
+# Ingredient family definitions for collision detection
+
+families:
+  mexican:
+    - nachos
+    - taco
+    - burrito
+    - quesadilla
+    - carnitas
+    - birria
+
+  cajun:
+    - cajun
+    - creole
+    - gumbo
+    - jambalaya
+    - andouille
+
+  buffalo:
+    - buffalo
+    - hot wing
+    - nashville hot
+
+  bbq:
+    - bbq
+    - pulled pork
+    - brisket
+    - smoked
+
+  asian:
+    - teriyaki
+    - kung pao
+    - stir fry
+    - fried rice
+
+  seafood:
+    - shrimp
+    - cod
+    - fish
+    - salmon

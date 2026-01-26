@@ -44,6 +44,9 @@ from backend.api.routers import (
     rooms_router,
 )
 
+# Menu Planning module
+from backend.core.menu_planning.router import router as menu_planning_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -117,6 +120,9 @@ app.include_router(memory_router)
 
 # History tracking
 app.include_router(history_router)
+
+# Menu Planning
+app.include_router(menu_planning_router, prefix="/api")
 
 
 # ============== Health Check ==============
