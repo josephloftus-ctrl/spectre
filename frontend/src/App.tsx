@@ -2,8 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { CommandBar } from '@/components/command'
 import {
-  DashboardPage, DocumentsPage, NotesPage, SettingsPage,
-  SitePage, AssistantPage, SearchPage, InventoryPage,
+  InboxPage, IssuesPage, InventoryPage,
+  NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage,
   PurchaseMatchDetailPage, PurchaseMatchCategoryPage,
   CartPage, CountSessionPage, OffCatalogPage, RoomsPage
 } from '@/pages'
@@ -16,8 +16,8 @@ function App() {
         <Routes>
           {/* Main Views */}
           <Route path="/" element={<Navigate to="/inbox" replace />} />
-          <Route path="/inbox" element={<DocumentsPage />} />
-          <Route path="/issues" element={<DashboardPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/issues" element={<IssuesPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
 
           {/* Inventory sub-routes */}
