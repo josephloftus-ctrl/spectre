@@ -37,14 +37,14 @@ function App() {
 
           {/* Legacy redirects */}
           <Route path="/documents" element={<Navigate to="/inbox" replace />} />
-          <Route path="/scores" element={<Navigate to="/inventory?tab=health" replace />} />
-          <Route path="/history" element={<Navigate to="/inventory?tab=history" replace />} />
-          <Route path="/purchase-match" element={<Navigate to="/inventory?tab=match" replace />} />
-          <Route path="/collections" element={<Navigate to="/search?tab=collections" replace />} />
+          <Route path="/scores" element={<Navigate to="/inventory" replace />} />
+          <Route path="/history" element={<Navigate to="/inventory" replace />} />
+          <Route path="/purchase-match" element={<Navigate to="/inventory" replace />} />
+          <Route path="/collections" element={<Navigate to="/search" replace />} />
           <Route path="/ai" element={<Navigate to="/assistant" replace />} />
           <Route path="/standup" element={<Navigate to="/assistant" replace />} />
           <Route path="/glance" element={<Navigate to="/issues" replace />} />
-          <Route path="/system" element={<Navigate to="/settings?debug=1" replace />} />
+          <Route path="/system" element={<Navigate to="/settings" replace />} />
 
           {/* Legacy site routes */}
           <Route path="/site/:siteId" element={<SitePage />} />

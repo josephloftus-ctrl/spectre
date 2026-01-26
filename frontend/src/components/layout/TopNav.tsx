@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: '/inbox', label: 'Inbox' },
   { path: '/issues', label: 'Issues' },
   { path: '/inventory', label: 'Inventory' },
+  { path: '/assistant', label: 'Assistant' },
 ]
 
 export function TopNav() {
