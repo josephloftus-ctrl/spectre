@@ -45,7 +45,8 @@ class ScoreStatus(str, Enum):
 # Whitelist of allowed columns for update operations (SQL injection prevention)
 ALLOWED_FILE_COLUMNS = {
     'status', 'error_message', 'parsed_data', 'current_path',
-    'embedding_id', 'updated_at', 'processed_at', 'site_id', 'filename', 'collection'
+    'embedding_id', 'updated_at', 'processed_at', 'site_id', 'filename', 'collection',
+    'inventory_date'
 }
 
 ALLOWED_JOB_COLUMNS = {
@@ -105,6 +106,7 @@ def init_db():
                 error_message TEXT,
                 parsed_data TEXT,  -- JSON blob of extracted data
                 embedding_id TEXT,  -- Reference to ChromaDB collection
+                inventory_date TEXT,  -- User-assigned date for when inventory was taken
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 processed_at TEXT
@@ -397,3 +399,9 @@ def migrate_db():
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_custom_rooms_site ON custom_rooms(site_id)")
+
+        # Add inventory_date column to files table
+        cursor = conn.execute("PRAGMA table_info(files)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'inventory_date' not in columns:
+            conn.execute("ALTER TABLE files ADD COLUMN inventory_date TEXT")
