@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useTheme } from '@/hooks'
 
 const NAV_ITEMS = [
+  { path: '/', label: 'Dashboard' },
   { path: '/inbox', label: 'Inbox' },
   { path: '/issues', label: 'Issues' },
   { path: '/inventory', label: 'Inventory' },
