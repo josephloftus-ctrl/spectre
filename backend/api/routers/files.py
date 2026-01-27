@@ -94,7 +94,7 @@ def update_file_metadata(file_id: str, request: FileUpdateRequest):
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    updated = update_file(file_id, updates)
+    updated = update_file(file_id, **updates)
     return updated
 
 
