@@ -7,7 +7,6 @@ import {
   fetchSiteFlaggedItems,
   type UnitScore,
   type FlaggedItem,
-  type FlagType,
   formatSiteName,
 } from '@/lib/api'
 
@@ -16,10 +15,13 @@ interface IssueItem extends FlaggedItem {
   siteName: string
 }
 
-const FLAG_LABELS: Record<FlagType, { label: string; variant: 'destructive' | 'secondary' | 'outline'; className?: string }> = {
+const FLAG_LABELS: Record<string, { label: string; variant: 'destructive' | 'secondary' | 'outline'; className?: string }> = {
   uom_error: { label: 'UOM Error', variant: 'secondary', className: 'bg-warning/10 text-warning border-warning/20' },
   big_dollar: { label: 'High Value', variant: 'destructive' },
+  flagged_distributor: { label: 'Distributor', variant: 'outline', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
 }
+
+const DEFAULT_FLAG = { label: 'Flag', variant: 'outline' as const, className: '' }
 
 export function IssuesPage() {
   const [issues, setIssues] = useState<IssueItem[]>([])
@@ -177,7 +179,7 @@ export function IssuesPage() {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <p className="font-medium">{issue.item}</p>
                     {issue.flags.map(flag => {
-                      const flagConfig = FLAG_LABELS[flag]
+                      const flagConfig = FLAG_LABELS[flag] || DEFAULT_FLAG
                       return (
                         <Badge key={flag} variant={flagConfig.variant} className={`text-xs ${flagConfig.className || ''}`}>
                           {flagConfig.label}

@@ -1,8 +1,8 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
-import { Package, DollarSign } from "lucide-react"
+import { Package, DollarSign, Truck, Flag } from "lucide-react"
 
-export type FlagType = "uom_error" | "big_dollar"
+export type FlagType = "uom_error" | "big_dollar" | "flagged_distributor"
 
 interface FlagBadgeProps {
   type: FlagType
@@ -34,12 +34,28 @@ const flagConfig: Record<FlagType, {
     borderColor: "border-amber-500/30",
     Icon: DollarSign,
   },
+  flagged_distributor: {
+    label: "Distributor",
+    shortLabel: "Dist",
+    color: "text-blue-600",
+    bgColor: "bg-blue-500/10",
+    borderColor: "border-blue-500/30",
+    Icon: Truck,
+  },
+}
+
+// Fallback config for unknown flag types
+const defaultFlagConfig = {
+  label: "Flag",
+  shortLabel: "?",
+  color: "text-muted-foreground",
+  bgColor: "bg-muted/50",
+  borderColor: "border-muted",
+  Icon: Flag,
 }
 
 export function FlagBadge({ type, className, showLabel = true }: FlagBadgeProps) {
-  const config = flagConfig[type]
-  if (!config) return null
-
+  const config = flagConfig[type] || defaultFlagConfig
   const { Icon, shortLabel, color, bgColor, borderColor } = config
 
   return (

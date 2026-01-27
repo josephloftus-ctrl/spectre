@@ -36,6 +36,7 @@ export interface FileRecord {
     error_message: string | null;
     parsed_data: string | null;
     embedding_id: string | null;
+    inventory_date: string | null;
     created_at: string;
     updated_at: string;
     processed_at: string | null;
@@ -153,6 +154,17 @@ export const downloadFile = async (fileId: string): Promise<Blob> => {
     const { data } = await api.get(`/files/${fileId}/download`, {
         responseType: 'blob'
     });
+    return data;
+};
+
+export interface FileUpdateRequest {
+    inventory_date?: string | null;
+    site_id?: string | null;
+    filename?: string;
+}
+
+export const updateFile = async (fileId: string, updates: FileUpdateRequest): Promise<FileRecord> => {
+    const { data } = await api.patch<FileRecord>(`/files/${fileId}`, updates);
     return data;
 };
 
@@ -346,7 +358,7 @@ export const runCleanup = async (days: number = 30): Promise<{ success: boolean;
 
 export type ScoreStatus = 'critical' | 'warning' | 'healthy' | 'clean';
 export type TrendType = 'up' | 'down' | 'stable' | null;
-export type FlagType = 'uom_error' | 'big_dollar';
+export type FlagType = 'uom_error' | 'big_dollar' | 'flagged_distributor';
 
 export interface SourceFile {
     id: string;

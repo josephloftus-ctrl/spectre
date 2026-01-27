@@ -3,6 +3,7 @@ File management API router.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import Response
+from pydantic import BaseModel
 from typing import Optional
 from urllib.parse import quote
 import uuid
@@ -10,8 +11,15 @@ import re
 
 from backend.core.database import (
     FileStatus, JobType,
-    get_file, list_files, create_job
+    get_file, list_files, create_job, update_file
 )
+
+
+class FileUpdateRequest(BaseModel):
+    """Request body for updating file metadata."""
+    inventory_date: Optional[str] = None
+    site_id: Optional[str] = None
+    filename: Optional[str] = None
 from backend.core.files import (
     save_uploaded_file, retry_failed_file, get_file_content, delete_file
 )
@@ -65,6 +73,29 @@ def get_file_detail(file_id: str):
     if not file_record:
         raise HTTPException(status_code=404, detail="File not found")
     return file_record
+
+
+@router.patch("/{file_id}")
+def update_file_metadata(file_id: str, request: FileUpdateRequest):
+    """Update file metadata (inventory_date, site_id, filename)."""
+    file_record = get_file(file_id)
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Build updates dict from non-None fields
+    updates = {}
+    if request.inventory_date is not None:
+        updates["inventory_date"] = request.inventory_date
+    if request.site_id is not None:
+        updates["site_id"] = request.site_id
+    if request.filename is not None:
+        updates["filename"] = request.filename
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    updated = update_file(file_id, **updates)
+    return updated
 
 
 @router.get("/{file_id}/download")

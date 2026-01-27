@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Upload, FileText, CheckCircle, AlertCircle, Clock, Trash2, RotateCcw, Download, Loader2 } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertCircle, Clock, Trash2, RotateCcw, Download, Loader2, Calendar, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { FileTimeline } from '@/components/inbox/FileTimeline'
 import {
   fetchFiles,
   uploadFile,
@@ -11,6 +12,8 @@ import {
   type FileStatus,
   formatSiteName,
 } from '@/lib/api'
+
+type ViewMode = 'queue' | 'timeline'
 
 const STATUS_CONFIG: Record<FileStatus, { icon: typeof Clock; label: string; className: string }> = {
   pending: { icon: Clock, label: 'Pending', className: 'text-muted-foreground' },
@@ -26,6 +29,7 @@ export function InboxPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('queue')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadFiles = useCallback(async () => {
@@ -123,6 +127,13 @@ export function InboxPage() {
     }
   }
 
+  const handleFileUpdated = (updatedFile: FileRecord) => {
+    setFiles(prev => prev.map(f => f.id === updatedFile.id ? updatedFile : f))
+    if (selectedFile?.id === updatedFile.id) {
+      setSelectedFile(updatedFile)
+    }
+  }
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -154,7 +165,29 @@ export function InboxPage() {
           <h1 className="text-2xl font-semibold">Inbox</h1>
           <p className="text-muted-foreground">Upload and validate files before processing</p>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center rounded-lg border p-1">
+            <Button
+              variant={viewMode === 'queue' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="gap-2"
+              onClick={() => setViewMode('queue')}
+            >
+              <List className="h-4 w-4" />
+              Queue
+            </Button>
+            <Button
+              variant={viewMode === 'timeline' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="gap-2"
+              onClick={() => setViewMode('timeline')}
+            >
+              <Calendar className="h-4 w-4" />
+              Timeline
+            </Button>
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -179,6 +212,18 @@ export function InboxPage() {
         </div>
       )}
 
+      {viewMode === 'timeline' ? (
+        <Card className="p-6 h-[calc(100%-5rem)] overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              Loading files...
+            </div>
+          ) : (
+            <FileTimeline files={files} onFileUpdated={handleFileUpdated} />
+          )}
+        </Card>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100%-5rem)]">
         {/* File Queue */}
         <Card
@@ -350,6 +395,7 @@ export function InboxPage() {
           )}
         </Card>
       </div>
+      )}
     </div>
   )
 }
