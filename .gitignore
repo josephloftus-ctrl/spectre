@@ -76,3 +76,4 @@ inventory_watch.log
 # Large model files
 *.gguf
 models/*.gguf
+.worktrees/
