@@ -344,6 +344,24 @@ def process_score_job(job: dict) -> dict:
 
         logger.info(f"Scored site {site_id}: score={score_result['score']}, status={score_result['status']}, rooms={score_result['summary'].get('flagged_rooms', 0)}")
 
+        # Save snapshot for historical tracking (store forever)
+        snapshot_date = datetime.utcnow().strftime("%Y-%m-%d")
+        snapshot_id = str(uuid.uuid4())
+        try:
+            save_score_snapshot(
+                snapshot_id=snapshot_id,
+                site_id=site_id,
+                score=score_result["score"],
+                status=score_result["status"],
+                item_flag_count=score_result["summary"]["flagged_items"],
+                room_flag_count=score_result["summary"].get("flagged_rooms", 0),
+                total_value=score_result["summary"]["total_value"],
+                snapshot_date=snapshot_date
+            )
+            logger.info(f"Saved score snapshot for {site_id} on {snapshot_date}")
+        except Exception as e:
+            logger.warning(f"Failed to save snapshot for {site_id}: {e}")
+
         return {
             "success": True,
             "site_id": site_id,

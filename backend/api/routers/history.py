@@ -15,13 +15,21 @@ router = APIRouter(prefix="/api/history", tags=["History"])
 @router.get("/{site_id}")
 def get_site_history(
     site_id: str,
-    days: int = Query(30, le=90)
+    weeks: int = Query(3, ge=1, le=52, description="Number of weeks of history (default: 3 = current + 2 previous)"),
+    days: int = Query(None, le=365, description="Deprecated: use weeks instead")
 ):
     """
     Get historical data for a site.
     Returns score history plus computed metrics.
+
+    Default shows current week + 2 previous weeks (weeks=3).
+    Set weeks higher to see more history (max 52 weeks / 1 year).
+    Data is stored forever, this just controls the view.
     """
-    weeks = max(1, days // 7)
+    # Support legacy days param for backwards compatibility
+    if days is not None:
+        weeks = max(1, days // 7)
+
     history = get_score_history(site_id, limit=weeks)
     current = get_unit_score(site_id)
 

@@ -109,28 +109,60 @@ def save_score_snapshot(
     total_value: float,
     snapshot_date: str
 ) -> Dict[str, Any]:
-    """Save a weekly score snapshot."""
+    """
+    Save a score snapshot. Updates if one already exists for site_id + snapshot_date,
+    otherwise inserts new record. Snapshots are kept forever for historical tracking.
+    """
     now = datetime.utcnow().isoformat()
 
     with get_db() as conn:
-        conn.execute("""
-            INSERT INTO score_history (
-                id, site_id, score, status,
-                item_flag_count, room_flag_count,
-                total_value, snapshot_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            snapshot_id, site_id, score, status,
-            item_flag_count, room_flag_count,
-            total_value, snapshot_date, now
-        ))
+        # Check if snapshot already exists for this site and date
+        existing = conn.execute(
+            "SELECT id FROM score_history WHERE site_id = ? AND snapshot_date = ?",
+            (site_id, snapshot_date)
+        ).fetchone()
 
-    return {
-        "id": snapshot_id,
-        "site_id": site_id,
-        "score": score,
-        "snapshot_date": snapshot_date
-    }
+        if existing:
+            # Update existing snapshot
+            conn.execute("""
+                UPDATE score_history SET
+                    score = ?, status = ?,
+                    item_flag_count = ?, room_flag_count = ?,
+                    total_value = ?
+                WHERE site_id = ? AND snapshot_date = ?
+            """, (
+                score, status,
+                item_flag_count, room_flag_count,
+                total_value, site_id, snapshot_date
+            ))
+            return {
+                "id": existing["id"],
+                "site_id": site_id,
+                "score": score,
+                "snapshot_date": snapshot_date,
+                "updated": True
+            }
+        else:
+            # Insert new snapshot
+            conn.execute("""
+                INSERT INTO score_history (
+                    id, site_id, score, status,
+                    item_flag_count, room_flag_count,
+                    total_value, snapshot_date, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                snapshot_id, site_id, score, status,
+                item_flag_count, room_flag_count,
+                total_value, snapshot_date, now
+            ))
+
+            return {
+                "id": snapshot_id,
+                "site_id": site_id,
+                "score": score,
+                "snapshot_date": snapshot_date,
+                "updated": False
+            }
 
 
 def get_score_history(

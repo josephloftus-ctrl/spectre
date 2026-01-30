@@ -673,9 +673,9 @@ export interface AnomaliesResponse {
     message?: string;
 }
 
-export const fetchSiteHistory = async (siteId: string, days: number = 30): Promise<SiteHistory> => {
+export const fetchSiteHistory = async (siteId: string, weeks: number = 3): Promise<SiteHistory> => {
     const { data } = await api.get<SiteHistory>(`/history/${encodeURIComponent(siteId)}`, {
-        params: { days }
+        params: { weeks }
     });
     return data;
 };

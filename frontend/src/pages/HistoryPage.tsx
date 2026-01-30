@@ -58,7 +58,7 @@ interface WeekGroup {
   }>
 }
 
-type TimeRange = 7 | 30 | 90
+type TimeRange = 3 | 8 | 12 | 52  // weeks: 3 (default), 8 (~2 months), 12 (~3 months), 52 (year)
 
 interface MetricCardProps {
   title: string
@@ -272,7 +272,7 @@ function HistoryTimeline({ weekGroups, formatCurrency }: HistoryTimelineProps) {
 export function HistoryPage() {
   const [sites, setSites] = useState<string[]>([])
   const [selectedSite, setSelectedSite] = useState<string>('')
-  const [timeRange, setTimeRange] = useState<TimeRange>(30)
+  const [timeRange, setTimeRange] = useState<TimeRange>(3)
   const [loading, setLoading] = useState(true)
   const [history, setHistory] = useState<SiteHistory | null>(null)
   const [movers, setMovers] = useState<MoversResponse | null>(null)
@@ -366,14 +366,19 @@ export function HistoryPage() {
         </div>
 
         <div className="flex gap-1">
-          {([7, 30, 90] as TimeRange[]).map(range => (
+          {([
+            { value: 3 as TimeRange, label: '3w' },
+            { value: 8 as TimeRange, label: '2mo' },
+            { value: 12 as TimeRange, label: '3mo' },
+            { value: 52 as TimeRange, label: '1y' }
+          ]).map(({ value, label }) => (
             <Button
-              key={range}
-              variant={timeRange === range ? 'secondary' : 'ghost'}
+              key={value}
+              variant={timeRange === value ? 'secondary' : 'ghost'}
               size="sm"
-              onClick={() => setTimeRange(range)}
+              onClick={() => setTimeRange(value)}
             >
-              {range}d
+              {label}
             </Button>
           ))}
         </div>
