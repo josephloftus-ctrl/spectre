@@ -11,6 +11,7 @@ import json
 import uuid
 
 from .naming import extract_site_from_filename
+from .parsers import extract_header_metadata
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -152,31 +153,46 @@ def process_parse_job(job: dict) -> dict:
         # Parse the file (supports Excel, CSV, PDF)
         parsed_data = parse_file(str(file_path))
 
-        # Determine site_id priority:
-        # 1. Already set in file record (from upload)
-        # 2. Extracted from Excel content (metadata.site_id)
-        # 3. Extracted from filename
-        # 4. Default to "unknown"
-        site_id = file_record.get("site_id")
-        if not site_id:
-            # Check if parser extracted site from Excel content
-            site_id = parsed_data.get("metadata", {}).get("site_id")
-            if site_id:
-                update_file(file_id, site_id=site_id)
-                logger.info(f"Extracted site_id '{site_id}' from Excel content")
-            else:
-                # Fall back to filename extraction
-                filename = file_record.get("filename", "")
-                site_id = extract_site_from_filename(filename)
+        # Extract metadata from Excel header (source of truth)
+        # Row 1: inventory date, Row 2: site name
+        header_meta = extract_header_metadata(str(file_path))
+
+        # Use Excel header as authoritative source if extraction succeeded
+        if header_meta.get("extracted"):
+            site_id = header_meta["site_id"]
+            site_name = header_meta["site_name"]
+            inventory_date = header_meta["inventory_date"]
+            update_file(file_id, site_id=site_id)
+            logger.info(f"Extracted from Excel header: site='{site_name}', date={inventory_date}")
+        else:
+            # Fall back to old logic if header extraction failed
+            site_name = None
+            inventory_date = None
+            site_id = file_record.get("site_id")
+
+            if not site_id:
+                # Check if parser extracted site from Excel content
+                site_id = parsed_data.get("metadata", {}).get("site_id")
                 if site_id:
                     update_file(file_id, site_id=site_id)
-                    logger.info(f"Extracted site_id '{site_id}' from filename '{filename}'")
+                    logger.info(f"Extracted site_id '{site_id}' from Excel content")
                 else:
-                    site_id = "unknown"
-                    logger.warning(f"Could not extract site_id for file '{filename}'")
+                    # Fall back to filename extraction
+                    filename = file_record.get("filename", "")
+                    site_id = extract_site_from_filename(filename)
+                    if site_id:
+                        update_file(file_id, site_id=site_id)
+                        logger.info(f"Extracted site_id '{site_id}' from filename '{filename}'")
+                    else:
+                        site_id = "unknown"
+                        logger.warning(f"Could not extract site_id for file '{filename}'")
 
-        # Move to processed
-        move_to_processed(file_id, site_id, parsed_data)
+        # Move to processed (with auto-rename and sort)
+        move_to_processed(
+            file_id, site_id, parsed_data,
+            site_name=site_name,
+            inventory_date=inventory_date
+        )
 
         # Queue scoring job first (fast, shows data on dashboard quickly)
         score_job_id = str(uuid.uuid4())

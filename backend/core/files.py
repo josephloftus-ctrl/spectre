@@ -6,16 +6,17 @@ import os
 import shutil
 import uuid
 import json
+import hashlib
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 import mimetypes
 
 from .database import (
     create_file, update_file, update_file_status,
-    create_job, FileStatus, JobType
+    create_job, FileStatus, JobType, list_files
 )
-from .naming import normalize_site_id, generate_standard_filename
+from .naming import normalize_site_id, generate_standard_filename, extract_site_from_filename
 
 # Base data directory
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -71,6 +72,43 @@ def validate_file(filename: str, content_type: Optional[str] = None) -> Tuple[bo
     return True, ""
 
 
+def compute_file_hash(content: bytes) -> str:
+    """Compute SHA-256 hash of file content."""
+    return hashlib.sha256(content).hexdigest()
+
+
+def check_for_duplicate(
+    filename: str,
+    site_id: str,
+    content_hash: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Check if a duplicate file already exists.
+
+    A duplicate is defined as:
+    - Same standardized filename AND same site_id, OR
+    - Same content hash (regardless of filename)
+
+    Returns the existing file record if duplicate found, None otherwise.
+    """
+    # Get all completed files for this site
+    existing_files = list_files(site_id=site_id, status=FileStatus.COMPLETED)
+
+    # Generate what the standardized filename would be
+    standard_filename = generate_standard_filename(site_id, filename)
+
+    for file_record in existing_files:
+        # Check for same standardized filename
+        if file_record.get('filename') == standard_filename:
+            return file_record
+
+        # Check for same content hash (if stored)
+        if file_record.get('content_hash') == content_hash:
+            return file_record
+
+    return None
+
+
 def save_uploaded_file(
     file_content: bytes,
     filename: str,
@@ -82,20 +120,44 @@ def save_uploaded_file(
     Automatically renames to standard format: {SITE}_{YYYY-MM-DD}.{ext}
 
     Returns the file record from the database.
+
+    Raises:
+        ValueError: If file type not allowed or site cannot be determined
     """
-    # Validate
+    # Validate file type
     is_valid, error = validate_file(filename, content_type)
     if not is_valid:
         raise ValueError(error)
+
+    # Validate site can be determined
+    # If no site_id provided, check if we can extract from filename
+    if not site_id:
+        extracted_site = extract_site_from_filename(filename)
+        if not extracted_site:
+            raise ValueError(
+                f"Cannot determine site from filename '{filename}'. "
+                "Please select a site or use the naming format: 'MM.DD.YY - Site Name.xlsx' "
+                "(e.g., '01.15.25 - PSEG NHQ.xlsx')"
+            )
+
+    # Normalize site_id (infer from filename if not provided)
+    normalized_site = normalize_site_id(site_id, filename)
+
+    # Check for duplicates before creating file
+    content_hash = compute_file_hash(file_content)
+    existing = check_for_duplicate(filename, normalized_site, content_hash)
+    if existing:
+        existing_name = existing.get('filename', 'unknown')
+        raise ValueError(
+            f"Duplicate file detected. A file with the same content or name "
+            f"already exists for site '{normalized_site}': {existing_name}"
+        )
 
     # Generate ID and paths
     file_id = generate_file_id()
     file_type = get_file_type(filename)
     file_dir = INBOX_DIR / file_id
     file_dir.mkdir(parents=True, exist_ok=True)
-
-    # Normalize site_id (infer from filename if not provided)
-    normalized_site = normalize_site_id(site_id, filename)
 
     # Generate standardized filename
     standard_filename = generate_standard_filename(normalized_site, filename)
@@ -120,14 +182,15 @@ def save_uploaded_file(
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
 
-    # Create database record with standardized filename
+    # Create database record with standardized filename and content hash
     file_record = create_file(
         file_id=file_id,
         filename=standard_filename,
         original_path=str(file_path),
         file_type=file_type,
         file_size=len(file_content),
-        site_id=normalized_site
+        site_id=normalized_site,
+        content_hash=content_hash
     )
 
     # Queue a processing job
@@ -137,10 +200,23 @@ def save_uploaded_file(
     return file_record
 
 
-def move_to_processed(file_id: str, site_id: str, parsed_data: Dict[str, Any]) -> str:
+def move_to_processed(
+    file_id: str,
+    site_id: str,
+    parsed_data: Dict[str, Any],
+    site_name: Optional[str] = None,
+    inventory_date: Optional[str] = None
+) -> str:
     """
     Move a file from inbox to processed folder.
-    Organizes by site and date.
+    Renames and organizes by site name and inventory date.
+
+    Args:
+        file_id: Unique file identifier
+        site_id: Slugified site ID for database
+        parsed_data: Parsed file contents
+        site_name: Human-readable site name (e.g., "PSEG - NHQ") for folder/filename
+        inventory_date: ISO date string (YYYY-MM-DD) from Excel content
 
     Returns the new path.
     """
@@ -160,16 +236,36 @@ def move_to_processed(file_id: str, site_id: str, parsed_data: Dict[str, Any]) -
     if not original_file:
         raise FileNotFoundError(f"No file found in {inbox_path}")
 
-    # Create destination path
-    date_str = datetime.utcnow().strftime("%Y-%m")
-    dest_dir = PROCESSED_DIR / site_id / date_str
+    # Use site_name for folder organization, fall back to site_id
+    folder_name = site_name if site_name else site_id
+
+    # Use inventory_date for date organization, fall back to current date
+    if inventory_date:
+        date_month = inventory_date[:7]  # "YYYY-MM"
+    else:
+        date_month = datetime.utcnow().strftime("%Y-%m")
+        inventory_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Create destination directory: data/processed/{SITE_NAME}/{YYYY-MM}/
+    dest_dir = PROCESSED_DIR / folder_name / date_month
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    # Move file
-    dest_path = dest_dir / f"{file_id}_{original_file.name}"
+    # Generate standardized filename: {SITE_NAME}_{YYYY-MM-DD}.xlsx
+    ext = original_file.suffix.lower()
+    base_filename = f"{folder_name}_{inventory_date}{ext}"
+
+    # Handle duplicates by appending counter
+    dest_path = dest_dir / base_filename
+    counter = 2
+    while dest_path.exists():
+        base_filename = f"{folder_name}_{inventory_date}_{counter}{ext}"
+        dest_path = dest_dir / base_filename
+        counter += 1
+
+    # Move and rename file
     shutil.move(str(original_file), str(dest_path))
 
-    # Save parsed data alongside
+    # Save parsed data alongside (use file_id prefix for uniqueness)
     parsed_path = dest_dir / f"{file_id}_parsed.json"
     with open(parsed_path, 'w') as f:
         json.dump(parsed_data, f, indent=2)
@@ -177,11 +273,13 @@ def move_to_processed(file_id: str, site_id: str, parsed_data: Dict[str, Any]) -
     # Clean up inbox folder
     shutil.rmtree(inbox_path)
 
-    # Update database
+    # Update database with new filename, path, and inventory_date
     update_file(
         file_id,
+        filename=base_filename,
         current_path=str(dest_path),
-        parsed_data=json.dumps(parsed_data)
+        parsed_data=json.dumps(parsed_data),
+        inventory_date=inventory_date
     )
     update_file_status(file_id, FileStatus.COMPLETED, parsed_data=parsed_data)
 

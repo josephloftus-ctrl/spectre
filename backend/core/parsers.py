@@ -673,3 +673,96 @@ def _extract_site_from_sheet(
         pass
 
     return None
+
+
+def extract_header_metadata(file_path: Union[str, Path]) -> Dict[str, Any]:
+    """
+    Extract inventory date and site name from Excel header rows.
+
+    Excel is the immutable source of truth. Looks at 'Data for Inventory Locations' sheet:
+    - Row 1: "Inventory Valuation Report from Inventory Input - MM/DD/YYYY"
+    - Row 2: "SITE NAME (unit#) (COMPASS)"
+
+    Returns:
+        {
+            "inventory_date": "2026-01-29",  # ISO format
+            "site_name": "PSEG - NHQ",       # Human readable (before first paren)
+            "site_id": "pseg_nhq",           # Slugified for DB
+            "extracted": True                # False if extraction failed
+        }
+    """
+    import openpyxl
+    from .naming import slugify
+
+    result = {
+        "inventory_date": None,
+        "site_name": None,
+        "site_id": None,
+        "extracted": False
+    }
+
+    p = Path(file_path)
+    if not p.exists() or p.suffix.lower() not in ('.xlsx', '.xls'):
+        return result
+
+    try:
+        wb = openpyxl.load_workbook(p, read_only=True, data_only=True)
+
+        # Find the data sheet - prioritize sheets with "data" in name
+        data_sheet = None
+
+        # First pass: look for "data" in sheet name (highest priority)
+        for name in wb.sheetnames:
+            if 'data' in name.lower():
+                data_sheet = wb[name]
+                break
+
+        # Second pass: look for "inventory" but not "summary"
+        if not data_sheet:
+            for name in wb.sheetnames:
+                name_lower = name.lower()
+                if 'inventory' in name_lower and 'summary' not in name_lower:
+                    data_sheet = wb[name]
+                    break
+
+        # Fall back to second sheet if exists (often the data sheet), else first
+        if not data_sheet:
+            if len(wb.sheetnames) > 1:
+                data_sheet = wb[wb.sheetnames[1]]
+            else:
+                data_sheet = wb.active
+
+        if not data_sheet:
+            wb.close()
+            return result
+
+        # Extract Row 1 - Date
+        row1_val = data_sheet.cell(row=1, column=1).value
+        if row1_val and isinstance(row1_val, str):
+            # Pattern: "... - MM/DD/YYYY"
+            date_match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})$', row1_val.strip())
+            if date_match:
+                month, day, year = date_match.groups()
+                result["inventory_date"] = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+
+        # Extract Row 2 - Site Name
+        row2_val = data_sheet.cell(row=2, column=1).value
+        if row2_val and isinstance(row2_val, str):
+            # Pattern: "SITE NAME (unit#) (COMPASS)" -> take text before first (
+            site_match = re.match(r'^([^(]+)', row2_val.strip())
+            if site_match:
+                site_name = site_match.group(1).strip()
+                if site_name:
+                    result["site_name"] = site_name
+                    result["site_id"] = slugify(site_name)
+
+        wb.close()
+
+        # Mark as extracted if we got both values
+        if result["inventory_date"] and result["site_name"]:
+            result["extracted"] = True
+
+    except Exception as e:
+        logger.warning(f"Failed to extract header metadata from {file_path}: {e}")
+
+    return result
