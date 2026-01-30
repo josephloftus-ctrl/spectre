@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchSummary, SiteSummary, formatSiteName } from '@/lib/api'
 import { KPIGrid } from '@/components/dashboard/KPIGrid'
-import { SkeletonKPI } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -61,8 +60,20 @@ export function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 animate-page-in">
-        <SkeletonKPI />
+      <div className="space-y-8 animate-page-in">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 w-40 skeleton rounded-lg" />
+            <div className="h-4 w-56 skeleton rounded-lg mt-2" />
+          </div>
+          <div className="h-10 w-48 skeleton rounded-xl" />
+        </div>
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-24 skeleton rounded-lg" />
+          ))}
+        </div>
         <div className="space-y-3">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-20 skeleton rounded-lg" />
@@ -74,17 +85,19 @@ export function DashboardPage() {
 
   if (error || !data) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 animate-page-in">
-        <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
-          <Activity className="h-8 w-8 text-destructive" />
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-6 animate-page-in">
+        <div className="h-20 w-20 rounded-2xl bg-destructive/10 ring-1 ring-destructive/20 flex items-center justify-center">
+          <Activity className="h-10 w-10 text-destructive" />
         </div>
-        <div className="text-lg font-semibold">Connection Lost</div>
-        <p className="text-muted-foreground text-center max-w-sm">
-          Unable to reach the backend API. Check that the server is running.
-        </p>
+        <div className="text-center">
+          <div className="text-xl font-bold font-head text-foreground">Connection Lost</div>
+          <p className="text-muted-foreground mt-2 max-w-sm">
+            Unable to reach the backend API. Check that the server is running.
+          </p>
+        </div>
         <button
           onClick={() => window.location.reload()}
-          className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg btn-press hover:bg-primary/90 transition-colors"
+          className="mt-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium btn-press hover:bg-primary/90 transition-colors shadow-lg shadow-primary/25"
         >
           Try Again
         </button>
@@ -119,24 +132,40 @@ export function DashboardPage() {
   })
 
   return (
-    <div className="space-y-6 animate-page-in">
-      {/* Tab Navigation */}
+    <div className="space-y-8 animate-page-in">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
+        <div>
+          <h1 className="text-2xl font-bold font-head tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">Operations overview and site health</p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-1 p-1.5 bg-muted/60 rounded-xl border border-border/50">
           <Button
-            variant={activeTab === 'overview' ? 'secondary' : 'ghost'}
+            variant={activeTab === 'overview' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => handleTabChange('overview')}
-            className={cn("gap-2", activeTab === 'overview' && "shadow-sm")}
+            className={cn(
+              "gap-2 rounded-lg transition-all",
+              activeTab === 'overview'
+                ? "shadow-md"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
             <LayoutGrid className="h-4 w-4" />
             Overview
           </Button>
           <Button
-            variant={activeTab === 'match' ? 'secondary' : 'ghost'}
+            variant={activeTab === 'match' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => handleTabChange('match')}
-            className={cn("gap-2", activeTab === 'match' && "shadow-sm")}
+            className={cn(
+              "gap-2 rounded-lg transition-all",
+              activeTab === 'match'
+                ? "shadow-md"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
             <ArrowRightLeft className="h-4 w-4" />
             Purchase Match
@@ -160,9 +189,9 @@ export function DashboardPage() {
 
           {/* Site List */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold font-head">Sites</h2>
-              <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold font-head tracking-tight">Sites</h2>
+              <div className="text-sm text-muted-foreground bg-muted px-4 py-1.5 rounded-full border border-border/50 font-medium">
                 {data.sites.length} Active
               </div>
             </div>
@@ -172,70 +201,75 @@ export function DashboardPage() {
                 const healthStatus = site.health_status || 'clean'
                 const healthScore = site.health_score || 0
 
-                // Border color based on worst status (currency or health)
-                let borderColor = "border-border"
+                // Determine ribbon status class
+                let ribbonClass = ""
                 if (currency.status === 'overdue' || healthStatus === 'critical') {
-                  borderColor = "border-red-500/50"
+                  ribbonClass = "status-ribbon-error"
                 } else if (currency.status === 'due' || healthStatus === 'warning') {
-                  borderColor = "border-amber-500/50"
+                  ribbonClass = "status-ribbon-warning"
+                } else if (currency.status === 'current' && healthStatus === 'clean') {
+                  ribbonClass = "status-ribbon-success"
                 }
 
                 return (
                   <Card
                     key={site.site}
-                    className={`overflow-hidden card-hover cursor-pointer ${borderColor} bg-card/50 animate-list-item`}
+                    className={cn(
+                      "status-ribbon overflow-hidden card-hover cursor-pointer bg-card/80 border-border/50 animate-list-item",
+                      ribbonClass
+                    )}
                     style={{ animationDelay: `${Math.min(index * 50, 300)}ms` }}
                     onClick={() => handleSiteClick(site.site)}
                   >
-                    <CardContent className="p-4 flex items-center justify-between">
+                    <CardContent className="p-5 pl-6 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div>
-                          <div className="font-medium">{formatSiteName(site.site)}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="font-semibold font-head text-foreground">{formatSiteName(site.site)}</div>
+                          <div className="text-sm text-muted-foreground mt-0.5">
                             {currency.daysOld === 0 ? 'Updated today' : `Updated ${currency.daysOld} day${currency.daysOld === 1 ? '' : 's'} ago`}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         {/* Currency Status */}
                         {currency.status === 'overdue' ? (
-                          <Badge variant="destructive">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
+                          <Badge variant="destructive" className="gap-1.5 px-2.5 py-1">
+                            <AlertTriangle className="h-3.5 w-3.5" />
                             Overdue
                           </Badge>
                         ) : currency.status === 'due' ? (
-                          <Badge variant="secondary" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
-                            <Clock className="h-3 w-3 mr-1" />
+                          <Badge className="gap-1.5 px-2.5 py-1 bg-warning/15 text-warning border-warning/30 hover:bg-warning/20">
+                            <Clock className="h-3.5 w-3.5" />
                             Due
                           </Badge>
                         ) : null}
 
                         {/* Health Status */}
                         {healthStatus === 'critical' ? (
-                          <Badge variant="destructive">
+                          <Badge variant="destructive" className="px-2.5 py-1">
                             {healthScore} issues
                           </Badge>
                         ) : healthStatus === 'warning' ? (
-                          <Badge variant="secondary" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                          <Badge className="px-2.5 py-1 bg-warning/15 text-warning border-warning/30 hover:bg-warning/20">
                             {healthScore} issues
                           </Badge>
                         ) : healthStatus === 'healthy' ? (
-                          <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                          <Badge variant="outline" className="px-2.5 py-1 text-info border-info/30 bg-info/10">
                             {healthScore} minor
                           </Badge>
                         ) : currency.status === 'current' ? (
-                          <Badge variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-900/20">
-                            <CheckCircle className="h-3 w-3 mr-1" />
+                          <Badge variant="outline" className="gap-1.5 px-2.5 py-1 text-success border-success/30 bg-success/10">
+                            <CheckCircle className="h-3.5 w-3.5" />
                             Clean
                           </Badge>
                         ) : null}
 
                         {/* Inventory Value */}
-                        <div className="text-right min-w-[100px]">
-                          <div className="text-lg font-bold font-head text-foreground">
+                        <div className="text-right min-w-[110px] pl-2 border-l border-border/50">
+                          <div className="data-value-sm text-foreground">
                             ${(site.latest_total || 0).toLocaleString()}
                           </div>
-                          <div className="text-xs text-muted-foreground">inventory value</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">inventory value</div>
                         </div>
                       </div>
                     </CardContent>

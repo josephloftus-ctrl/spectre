@@ -21,17 +21,17 @@ export function KPIGrid({ totalSites, totalIssues, totalValue }: KPIGridProps) {
     }
 
     return (
-        <div className="grid gap-3 grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             {/* Total Sites */}
-            <Card className="bg-card/50">
-                <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                            <Building2 className="h-4 w-4 text-primary" />
-                        </div>
+            <Card className="kpi-card bg-card border-border/50 card-hover">
+                <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-2xl font-bold font-head">{totalSites}</p>
-                            <p className="text-xs text-muted-foreground">Active Sites</p>
+                            <p className="text-sm font-medium text-muted-foreground mb-1">Active Sites</p>
+                            <p className="data-value text-foreground">{totalSites}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                            <Building2 className="h-5 w-5 text-primary" />
                         </div>
                     </div>
                 </CardContent>
@@ -39,41 +39,43 @@ export function KPIGrid({ totalSites, totalIssues, totalValue }: KPIGridProps) {
 
             {/* Total Issues */}
             <Card className={cn(
-                "bg-card/50",
-                totalIssues > 0 && "border-amber-500/30"
+                "kpi-card bg-card border-border/50 card-hover",
+                totalIssues > 0 && "border-warning/40"
             )}>
-                <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
+                <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-muted-foreground mb-1">Issues Found</p>
+                            <p className={cn(
+                                "data-value",
+                                totalIssues > 0 ? "text-warning" : "text-success"
+                            )}>{totalIssues}</p>
+                        </div>
                         <div className={cn(
-                            "p-2 rounded-lg",
-                            totalIssues > 0 ? "bg-amber-500/10" : "bg-emerald-500/10"
+                            "p-3 rounded-xl ring-1",
+                            totalIssues > 0
+                                ? "bg-warning/10 ring-warning/20"
+                                : "bg-success/10 ring-success/20"
                         )}>
                             <AlertTriangle className={cn(
-                                "h-4 w-4",
-                                totalIssues > 0 ? "text-amber-500" : "text-emerald-500"
+                                "h-5 w-5",
+                                totalIssues > 0 ? "text-warning" : "text-success"
                             )} />
-                        </div>
-                        <div>
-                            <p className={cn(
-                                "text-2xl font-bold font-head",
-                                totalIssues > 0 ? "text-amber-500" : ""
-                            )}>{totalIssues}</p>
-                            <p className="text-xs text-muted-foreground">Issues Found</p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
             {/* Total Inventory Value */}
-            <Card className="bg-card/50">
-                <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                            <DollarSign className="h-4 w-4 text-primary" />
-                        </div>
+            <Card className="kpi-card bg-card border-border/50 card-hover">
+                <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                            <p className="text-2xl font-bold font-head truncate">{formatCurrency(totalValue)}</p>
-                            <p className="text-xs text-muted-foreground">Total Value</p>
+                            <p className="text-sm font-medium text-muted-foreground mb-1">Total Value</p>
+                            <p className="data-value text-foreground truncate">{formatCurrency(totalValue)}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                            <DollarSign className="h-5 w-5 text-primary" />
                         </div>
                     </div>
                 </CardContent>

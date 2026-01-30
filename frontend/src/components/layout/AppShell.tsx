@@ -51,11 +51,19 @@ export function AppShell({ children }: AppShellProps) {
         <TopNav />
 
         {/* Main Content Area */}
-        <div className="flex pt-14">
+        <div className="flex pt-[60px]">
           {/* Workspace */}
-          <main className={`flex-1 transition-all duration-200 ${contextPanelOpen ? 'mr-[400px]' : ''}`}>
-            <div className="p-6 max-w-6xl mx-auto">
-              {children}
+          <main
+            className={`flex-1 transition-all duration-300 ease-out ${
+              contextPanelOpen ? 'mr-[var(--context-panel-width)]' : ''
+            }`}
+          >
+            {/* Subtle background grid pattern */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-grid opacity-30 pointer-events-none" />
+              <div className="relative px-6 py-6 max-w-7xl mx-auto">
+                {children}
+              </div>
             </div>
           </main>
 
