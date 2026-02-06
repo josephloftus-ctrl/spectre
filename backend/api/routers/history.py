@@ -8,6 +8,12 @@ from backend.core.database import (
     FileStatus, list_files,
     get_unit_score, get_score_history
 )
+from backend.core.db.history import (
+    get_available_weeks,
+    compare_weeks,
+    get_item_history,
+    get_week_summary
+)
 
 router = APIRouter(prefix="/api/history", tags=["History"])
 
@@ -220,4 +226,51 @@ def get_site_anomalies(
         "vanished_count": len(vanished),
         "latest_file": files[0].get("filename"),
         "previous_file": files[1].get("filename")
+    }
+
+
+# ============== Item-Level Weekly History ==============
+
+@router.get("/{site_id}/weeks")
+def get_site_weeks(
+    site_id: str,
+    limit: int = Query(52, le=104)
+):
+    """Get available weekly snapshots for a site."""
+    weeks = get_available_weeks(site_id, limit=limit)
+    return {
+        "site_id": site_id,
+        "weeks": weeks,
+        "count": len(weeks)
+    }
+
+
+@router.get("/{site_id}/compare")
+def compare_site_weeks(
+    site_id: str,
+    week1: str = Query(..., description="Earlier week (YYYY-MM-DD)"),
+    week2: str = Query(..., description="Later week (YYYY-MM-DD)")
+):
+    """Compare inventory between two weeks at item level."""
+    result = compare_weeks(site_id, week1, week2)
+
+    if result["summary"]["week1_item_count"] == 0 and result["summary"]["week2_item_count"] == 0:
+        raise HTTPException(status_code=404, detail="No data found for either week")
+
+    return result
+
+
+@router.get("/{site_id}/items/{sku}")
+def get_item_weekly_history(
+    site_id: str,
+    sku: str,
+    weeks: int = Query(12, ge=1, le=52)
+):
+    """Get weekly history for a specific item."""
+    history = get_item_history(site_id, sku, weeks=weeks)
+    return {
+        "site_id": site_id,
+        "sku": sku,
+        "history": history,
+        "count": len(history)
     }

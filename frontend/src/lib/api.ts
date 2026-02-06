@@ -7,7 +7,8 @@ export interface SiteSummary {
     latest_total: number;
     delta_pct: number;
     issue_count: number;
-    last_updated: string;
+    last_updated: string;  // When file was processed/uploaded
+    inventory_date?: string | null;  // When inventory was actually taken (from Excel)
     // Health scoring fields
     health_score?: number;
     health_status?: 'critical' | 'warning' | 'healthy' | 'clean';
@@ -1501,5 +1502,113 @@ export const fetchGLCodes = async (
     siteId: string
 ): Promise<{ gl_codes: string[]; count: number; source_file?: string }> => {
     const { data } = await api.get(`/inventory/sites/${siteId}/gl-codes`);
+    return data;
+};
+
+// ============== Classifications API ==============
+
+export interface ClassificationItem {
+    sku: string;
+    abc_class: 'A' | 'B' | 'C' | null;
+    xyz_class: 'X' | 'Y' | 'Z' | null;
+    combined_class: string | null;
+    total_value: number;
+    avg_quantity: number;
+    cv_score: number | null;
+    weeks_of_data: number;
+    last_calculated?: string;
+}
+
+export interface ClassificationSummary {
+    site_id: string;
+    abc_distribution: Record<string, { count: number; total_value: number; pct_of_value: number }>;
+    xyz_distribution: Record<string, { count: number; avg_cv: number | null }>;
+    nine_box: Record<string, number>;
+    last_calculated: string | null;
+}
+
+export const fetchClassifications = async (
+    siteId: string
+): Promise<{ site_id: string; items: ClassificationItem[]; summary: Record<string, number>; last_calculated: string | null }> => {
+    const { data } = await api.get(`/classifications/${siteId}`);
+    return data;
+};
+
+export const fetchClassificationSummary = async (
+    siteId: string
+): Promise<ClassificationSummary> => {
+    const { data } = await api.get(`/classifications/${siteId}/summary`);
+    return data;
+};
+
+export const refreshClassifications = async (
+    siteId: string
+): Promise<{ success: boolean; items_classified: number }> => {
+    const { data } = await api.post(`/classifications/${siteId}/refresh`);
+    return data;
+};
+
+export const fetchNineBox = async (
+    siteId: string
+): Promise<{ site_id: string; matrix: Record<string, number>; recommendations: Record<string, string> }> => {
+    const { data } = await api.get(`/classifications/${siteId}/nine-box`);
+    return data;
+};
+
+// ============== Item History API ==============
+
+export interface WeekComparison {
+    week1: string;
+    week2: string;
+    added: Array<Record<string, unknown>>;
+    removed: Array<Record<string, unknown>>;
+    changed: Array<{
+        sku: string;
+        description: string;
+        previous_qty: number;
+        current_qty: number;
+        qty_change: number;
+        previous_value: number;
+        current_value: number;
+        value_change: number;
+    }>;
+    summary: {
+        added_count: number;
+        removed_count: number;
+        changed_count: number;
+        week1_total_value: number;
+        week2_total_value: number;
+        value_change: number;
+        week1_item_count: number;
+        week2_item_count: number;
+    };
+}
+
+export const fetchAvailableWeeks = async (
+    siteId: string
+): Promise<{ site_id: string; weeks: string[] }> => {
+    const { data } = await api.get(`/history/${siteId}/weeks`);
+    return data;
+};
+
+export const fetchWeekComparison = async (
+    siteId: string,
+    week1: string,
+    week2: string
+): Promise<WeekComparison> => {
+    const { data } = await api.get(`/history/${siteId}/compare`, {
+        params: { week1, week2 }
+    });
+    return data;
+};
+
+export const fetchItemHistory = async (
+    siteId: string,
+    sku: string,
+    weeks?: number
+): Promise<{ site_id: string; sku: string; history: Array<Record<string, unknown>> }> => {
+    const { data } = await api.get(`/history/${siteId}/items/${encodeURIComponent(sku)}`, {
+        params: weeks ? { weeks } : undefined
+    });
     return data;
 };

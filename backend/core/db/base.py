@@ -46,7 +46,7 @@ class ScoreStatus(str, Enum):
 ALLOWED_FILE_COLUMNS = {
     'status', 'error_message', 'parsed_data', 'current_path',
     'embedding_id', 'updated_at', 'processed_at', 'site_id', 'filename', 'collection',
-    'inventory_date'
+    'inventory_date', 'content_hash'
 }
 
 ALLOWED_JOB_COLUMNS = {
@@ -107,6 +107,7 @@ def init_db():
                 parsed_data TEXT,  -- JSON blob of extracted data
                 embedding_id TEXT,  -- Reference to ChromaDB collection
                 inventory_date TEXT,  -- User-assigned date for when inventory was taken
+                content_hash TEXT,  -- SHA-256 hash for duplicate detection
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 processed_at TEXT
@@ -337,6 +338,40 @@ def init_db():
                 UNIQUE(site_id, name)
             );
 
+            -- ABC-XYZ item classifications (computed per-site)
+            CREATE TABLE IF NOT EXISTS item_classifications (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                sku TEXT NOT NULL,
+                abc_class TEXT,           -- 'A', 'B', 'C', or NULL
+                xyz_class TEXT,           -- 'X', 'Y', 'Z', or NULL
+                combined_class TEXT,      -- 'AX', 'BY', 'CZ', etc.
+                total_value REAL,
+                avg_quantity REAL,
+                cv_score REAL,
+                weeks_of_data INTEGER,
+                last_calculated TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, sku)
+            );
+
+            -- Weekly item-level inventory history for trend analysis
+            CREATE TABLE IF NOT EXISTS inventory_item_history (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                week_ending TEXT NOT NULL,
+                sku TEXT NOT NULL,
+                description TEXT,
+                quantity REAL,
+                unit_price REAL,
+                total_value REAL,
+                vendor TEXT,
+                location TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, week_ending, sku)
+            );
+
             -- Create indexes
             CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
             CREATE INDEX IF NOT EXISTS idx_files_site ON files(site_id);
@@ -360,6 +395,12 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_off_catalog_site ON off_catalog_items(site_id);
             CREATE INDEX IF NOT EXISTS idx_off_catalog_dist ON off_catalog_items(dist_num);
             CREATE INDEX IF NOT EXISTS idx_custom_rooms_site ON custom_rooms(site_id);
+            CREATE INDEX IF NOT EXISTS idx_classifications_site ON item_classifications(site_id);
+            CREATE INDEX IF NOT EXISTS idx_classifications_abc ON item_classifications(abc_class);
+            CREATE INDEX IF NOT EXISTS idx_classifications_combined ON item_classifications(combined_class);
+            CREATE INDEX IF NOT EXISTS idx_item_history_site ON inventory_item_history(site_id);
+            CREATE INDEX IF NOT EXISTS idx_item_history_week ON inventory_item_history(week_ending);
+            CREATE INDEX IF NOT EXISTS idx_item_history_sku ON inventory_item_history(site_id, sku);
         """)
 
     # Run migrations for existing databases
@@ -405,3 +446,53 @@ def migrate_db():
         columns = [row[1] for row in cursor.fetchall()]
         if 'inventory_date' not in columns:
             conn.execute("ALTER TABLE files ADD COLUMN inventory_date TEXT")
+
+        # Add content_hash column to files table for duplicate detection
+        cursor = conn.execute("PRAGMA table_info(files)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'content_hash' not in columns:
+            conn.execute("ALTER TABLE files ADD COLUMN content_hash TEXT")
+
+        # Create item_classifications table for existing databases
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS item_classifications (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                sku TEXT NOT NULL,
+                abc_class TEXT,
+                xyz_class TEXT,
+                combined_class TEXT,
+                total_value REAL,
+                avg_quantity REAL,
+                cv_score REAL,
+                weeks_of_data INTEGER,
+                last_calculated TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, sku)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_classifications_site ON item_classifications(site_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_classifications_abc ON item_classifications(abc_class)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_classifications_combined ON item_classifications(combined_class)")
+
+        # Create inventory_item_history table for existing databases
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS inventory_item_history (
+                id TEXT PRIMARY KEY,
+                site_id TEXT NOT NULL,
+                week_ending TEXT NOT NULL,
+                sku TEXT NOT NULL,
+                description TEXT,
+                quantity REAL,
+                unit_price REAL,
+                total_value REAL,
+                vendor TEXT,
+                location TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(site_id, week_ending, sku)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_item_history_site ON inventory_item_history(site_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_item_history_week ON inventory_item_history(week_ending)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_item_history_sku ON inventory_item_history(site_id, sku)")

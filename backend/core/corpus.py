@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 # Training corpus location
 TRAINING_DIR = Path(__file__).parent.parent.parent / "Training"
-KNOWLEDGE_COLLECTION = "knowledge_base"
+# Note: "knowledge_base" was empty, using "training_corpus" which has 1333 ingested documents
+KNOWLEDGE_COLLECTION = "training_corpus"
 
 # Re-export for backwards compatibility
 parse_file = extract_text

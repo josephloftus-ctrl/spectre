@@ -11,12 +11,22 @@ import { cn } from '@/lib/utils'
 
 type DashboardTab = 'overview' | 'match'
 
+// Format a date string to a readable format (e.g., "Jan 30")
+function formatShortDate(dateStr?: string | null): string {
+  if (!dateStr) return 'Unknown'
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 // Check if inventory is current (deadline: Friday 8am)
-function isInventoryCurrent(lastUpdated?: string): { current: boolean; daysOld: number; status: 'current' | 'due' | 'overdue' } {
-  if (!lastUpdated) return { current: false, daysOld: 999, status: 'overdue' }
+// Uses inventory_date (when count was taken) if available, otherwise falls back to last_updated
+function isInventoryCurrent(inventoryDate?: string | null, lastUpdated?: string): { current: boolean; daysOld: number; status: 'current' | 'due' | 'overdue' } {
+  // Prefer inventory_date (actual count date) over last_updated (upload date)
+  const dateToCheck = inventoryDate || lastUpdated
+  if (!dateToCheck) return { current: false, daysOld: 999, status: 'overdue' }
 
   const now = new Date()
-  const updated = new Date(lastUpdated)
+  const updated = new Date(dateToCheck)
   const diffMs = now.getTime() - updated.getTime()
   const daysOld = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
@@ -111,8 +121,8 @@ export function DashboardPage() {
 
   // Sort sites: overdue first, then by health score (worst first), then by value
   const sortedSites = [...data.sites].sort((a: SiteSummary, b: SiteSummary) => {
-    const statusA = isInventoryCurrent(a.last_updated)
-    const statusB = isInventoryCurrent(b.last_updated)
+    const statusA = isInventoryCurrent(a.inventory_date, a.last_updated)
+    const statusB = isInventoryCurrent(b.inventory_date, b.last_updated)
 
     // Sort by currency status first (overdue > due > current)
     const statusOrder = { overdue: 0, due: 1, current: 2 }
@@ -197,7 +207,7 @@ export function DashboardPage() {
             </div>
             <div className="space-y-3">
               {sortedSites.map((site: SiteSummary, index: number) => {
-                const currency = isInventoryCurrent(site.last_updated)
+                const currency = isInventoryCurrent(site.inventory_date, site.last_updated)
                 const healthStatus = site.health_status || 'clean'
                 const healthScore = site.health_score || 0
 
@@ -226,7 +236,14 @@ export function DashboardPage() {
                         <div>
                           <div className="font-semibold font-head text-foreground">{formatSiteName(site.site)}</div>
                           <div className="text-sm text-muted-foreground mt-0.5">
-                            {currency.daysOld === 0 ? 'Updated today' : `Updated ${currency.daysOld} day${currency.daysOld === 1 ? '' : 's'} ago`}
+                            {site.inventory_date ? (
+                              <>Counted {formatShortDate(site.inventory_date)}</>
+                            ) : (
+                              <>Uploaded {formatShortDate(site.last_updated)}</>
+                            )}
+                            {currency.daysOld > 0 && (
+                              <span className="text-muted-foreground/70"> · {currency.daysOld}d ago</span>
+                            )}
                           </div>
                         </div>
                       </div>

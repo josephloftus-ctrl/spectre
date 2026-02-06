@@ -17,6 +17,11 @@ requests>=2.31.0
 # Utilities
 aiofiles>=23.0.0
 
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0
+
 # Menu Planning
 pdfplumber>=0.10.0
 polars>=0.20.0

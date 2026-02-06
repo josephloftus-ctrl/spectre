@@ -25,6 +25,8 @@ from .memory import router as memory_router
 from .templates import router as templates_router
 from .history import router as history_router
 from .rooms import router as rooms_router
+from .classifications import router as classifications_router
+from .ai import router as ai_router
 
 __all__ = [
     "inventory_router",
@@ -51,4 +53,6 @@ __all__ = [
     "templates_router",
     "history_router",
     "rooms_router",
+    "classifications_router",
+    "ai_router",
 ]

@@ -1,6 +1,7 @@
 """
 Search and embeddings API router.
 """
+import logging
 from fastapi import APIRouter, HTTPException, Form, Query
 from typing import Optional
 import uuid
@@ -11,8 +12,11 @@ from backend.core.embeddings import (
     reset_collection, search_unified
 )
 from backend.core.collections import COLLECTIONS
+# Import purchase match state to access the initialized MOG embedding index
+from backend.api.routers.purchase_match import _purchase_match_state, _init_purchase_match
 
 router = APIRouter(tags=["Search"])
+logger = logging.getLogger(__name__)
 
 
 # ============== Search API ==============
@@ -28,22 +32,37 @@ def search_documents(
     sort_by: str = Form("relevance")
 ):
     """
-    Semantic search across documents with date awareness.
-    - Default: sorted by relevance, includes all dates
-    - site_id: Filter to specific site
-    - date_from/date_to: ISO date strings (YYYY-MM-DD) for filtering
-    - sort_by: 'relevance' (default), 'date_desc', 'date_asc', 'site'
+    Search for products in the MOG catalog.
+    Uses text matching on product descriptions.
     """
-    results = search(
-        query,
-        limit=limit,
-        file_id=file_id,
-        date_from=date_from,
-        date_to=date_to,
-        sort_by=sort_by,
-        site_id=site_id
-    )
-    return {"results": results, "count": len(results), "query": query}
+    # Ensure purchase match (and MOG index) is initialized
+    _init_purchase_match()
+
+    mog_index = _purchase_match_state.get("mog_index")
+    if not mog_index:
+        raise HTTPException(status_code=503, detail="Product search not available. MOG not loaded.")
+
+    # Text search - find items where description contains query terms
+    query_upper = query.upper()
+    query_words = query_upper.split()
+
+    results = []
+    for item in mog_index.all_items():
+        desc_upper = item.description.upper()
+        # Check if all query words appear in description
+        if all(word in desc_upper for word in query_words):
+            results.append({
+                "sku": item.sku,
+                "description": item.description,
+                "vendor": item.vendor,
+                "price": float(item.price) if item.price else None,
+                "match": "exact"
+            })
+
+    # Sort by description length (shorter = more specific match)
+    results.sort(key=lambda x: len(x["description"]))
+
+    return {"results": results[:limit], "count": len(results), "query": query}
 
 
 @router.get("/api/search/similar/{file_id}")

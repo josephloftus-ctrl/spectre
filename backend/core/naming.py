@@ -68,7 +68,9 @@ def extract_site_from_filename(filename: str) -> Optional[str]:
     - "PSEG NHQ 1_8.xlsx" -> "pseg_nhq"
     - "PSEG NHQ.xlsx" -> "pseg_nhq"
     - "Site Name 12-25.xlsx" -> "site_name"
-    - "Lockheed Martin 100.xlsx" -> "lockheed_martin_100"
+    - "Lockheed Martin 100.xlsx" -> "lockheed_100"
+    - "01.15.25 - PSEG NHQ.xlsx" -> "pseg_nhq"
+    - "NHQ_1_2026-01-18.xlsx" -> "pseg_nhq"
 
     Args:
         filename: Original filename
@@ -86,18 +88,40 @@ def extract_site_from_filename(filename: str) -> Optional[str]:
     if re.match(r'^[_\s\d\(\).-]+$', name):
         return None
 
-    # Remove date patterns (1_8, 12-25, 2024-01-08, etc.)
+    # First, try fuzzy matching against known site patterns (handles abbreviations)
+    known_match = match_known_site(name)
+    if known_match:
+        return known_match
+
+    # Remove date PREFIX patterns: "01.15.25 - ", "1.8.26 ", "12-26 - ", etc.
+    # MM.DD.YY or M.D.YY with optional separator after
+    name = re.sub(r'^\d{1,2}[._-]\d{1,2}[._-]?\d{0,4}\s*[-–]\s*', '', name)
+    name = re.sub(r'^\d{1,2}[._-]\d{1,2}[._-]\d{2,4}\s+', '', name)
+
+    # Remove standardized filename SUFFIX patterns: "_1_2026-01-18", "_1"
+    # This handles files like "NHQ_1_2026-01-18.xlsx" or "LOCKHEED_100_1_2026-01-18.xlsx"
+    name = re.sub(r'_\d+_\d{4}-\d{2}-\d{2}$', '', name)
+
+    # Remove date SUFFIX patterns (1_8, 12-25, 2024-01-08, etc.)
     name = re.sub(r'[\s_-]*\d{1,2}[_/-]\d{1,2}([_/-]\d{2,4})?$', '', name)
     name = re.sub(r'[\s_-]*\d{4}[_/-]\d{1,2}[_/-]\d{1,2}$', '', name)
 
-    # Remove trailing numbers and special chars
-    name = re.sub(r'[\s_-]*\d+$', '', name)
+    # Remove trailing version/sequence numbers like "_1" but preserve site numbers like "_100"
+    # Only remove if it's a small number (1-9) preceded by underscore
+    name = re.sub(r'_[1-9]$', '', name)
+
+    # Remove trailing numbers and special chars (but not if they're part of site name like "100")
     name = re.sub(r'[\s_-]+$', '', name)
 
     # Clean up and normalize
     name = name.strip()
     if not name or len(name) < 2:
         return None
+
+    # Try fuzzy matching again after cleanup
+    known_match = match_known_site(name)
+    if known_match:
+        return known_match
 
     # Convert to site_id format: lowercase, spaces to underscores
     site_id = re.sub(r'\s+', '_', name.lower())
@@ -108,13 +132,27 @@ def extract_site_from_filename(filename: str) -> Optional[str]:
 
 
 # Common site patterns for fuzzy matching
+# Order matters - more specific patterns should come first
+# Canonical site_id -> list of patterns that map to it
 KNOWN_SITE_PATTERNS = {
-    'pseg_nhq': ['pseg nhq', 'pseg_nhq', 'nhq'],
+    # Lockheed Martin Bldg 100 - canonical name with all variations
+    'lockheed_martin_bldg_100': [
+        'lockheed martin, bldg 100', 'lockheed_martin_bldg_100', 'lockheed martin bldg 100',
+        'lockhead martin, bldg 100', 'lockhead_martin_bldg_100',  # typo variants
+        'lockheed_100', 'lockheed 100', 'lockheed100', 'lm100', 'lm 100',
+        'bldg 100', 'bldg_100', 'building 100',
+    ],
+    # Lockheed Martin Bldg D - canonical name with all variations
+    'lockheed_martin_bldg_d': [
+        'lockheed martin, bldg d', 'lockheed_martin_bldg_d', 'lockheed martin bldg d',
+        'lockheed_bldg_d', 'lockheed_d', 'lockheed d', 'lmd',
+        'bldg d', 'bldg_d', 'building d',
+    ],
+    # PSEG sites
+    'pseg_nhq': ['pseg nhq', 'pseg_nhq', 'pseg - nhq', 'nhq', 'pseg-nhq'],
     'pseg_hq': ['pseg hq', 'pseg_hq', 'headquarters'],
-    'pseg_salem': ['pseg salem', 'pseg_salem', 'salem'],
-    'pseg_hope_creek': ['hope creek', 'hope_creek', 'hopecreek'],
-    'lockheed': ['lockheed', 'lm100', 'lockheed martin 100'],
-    'lockheed_bldg_d': ['bldg d', 'bldg_d', 'building d', 'lmd'],
+    'pseg_salem': ['pseg salem', 'pseg_salem', 'pseg - salem', 'salem'],
+    'pseg_hope_creek': ['pseg hope creek', 'pseg_hope_creek', 'pseg - hope creek', 'hope creek', 'hope_creek', 'hopecreek'],
 }
 
 

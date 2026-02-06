@@ -303,15 +303,42 @@ def search(
         )
 
         # Format results
+        # ChromaDB can use different distance metrics:
+        # - Cosine distance: 0 = identical, 2 = opposite
+        # - L2 (Euclidean): 0 = identical, unbounded
+        # We detect which by checking if distances are > 2
+        MIN_RELEVANCE_SCORE = 0.2  # Filter out low-quality matches (lower for L2)
+
+        distances = results["distances"][0] if results["distances"] else []
+        max_dist = max(distances) if distances else 0
+
+        # Heuristic: if max distance > 2, it's L2, otherwise cosine
+        is_l2 = max_dist > 2
+
         formatted = []
         for i in range(len(results["ids"][0])):
             metadata = results["metadatas"][0][i]
+            distance = results["distances"][0][i]
+
+            if is_l2:
+                # L2 distance: use exponential decay for similarity
+                # Smaller distance = higher score
+                # score = 1 / (1 + distance/100) gives reasonable scaling
+                score = 1 / (1 + distance / 100)
+            else:
+                # Cosine distance: 0 = identical, 2 = opposite
+                score = max(0, 1 - (distance / 2))
+
+            # Skip low-relevance results
+            if score < MIN_RELEVANCE_SCORE:
+                continue
+
             formatted.append({
                 "id": results["ids"][0][i],
                 "text": results["documents"][0][i],
                 "metadata": metadata,
-                "distance": results["distances"][0][i],
-                "score": 1 - results["distances"][0][i],
+                "distance": distance,
+                "score": score,
                 "date": metadata.get("date", ""),
                 "date_epoch": metadata.get("date_epoch", 0),
                 "collection": collection_name

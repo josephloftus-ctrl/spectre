@@ -15,6 +15,7 @@ import {
   getTrendColor,
 } from '@/components/ui/status-indicator'
 import { cn } from '@/lib/utils'
+import { ClassificationPanel } from './ClassificationPanel'
 
 interface SiteDetailPanelProps {
   siteId: string
@@ -194,6 +195,9 @@ export function SiteDetailPanel({ siteId }: SiteDetailPanelProps) {
           No flagged items for this site
         </div>
       )}
+
+      {/* ABC-XYZ Classification */}
+      <ClassificationPanel siteId={siteId} />
 
       {/* Recent Files */}
       {files.length > 0 && (

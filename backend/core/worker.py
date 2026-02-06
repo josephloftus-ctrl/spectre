@@ -31,6 +31,8 @@ from .analysis import (
     check_ollama_available
 )
 from .flag_checker import calculate_unit_score, calculate_comprehensive_score
+from .db.history import save_weekly_item_snapshot, get_week_ending_date
+from .classifier import refresh_classifications
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -377,6 +379,22 @@ def process_score_job(job: dict) -> dict:
             logger.info(f"Saved score snapshot for {site_id} on {snapshot_date}")
         except Exception as e:
             logger.warning(f"Failed to save snapshot for {site_id}: {e}")
+
+        # Save item-level history for trend tracking (ABC-XYZ needs this)
+        try:
+            week_ending = get_week_ending_date()
+            saved_count = save_weekly_item_snapshot(site_id, week_ending, rows)
+            logger.info(f"Saved {saved_count} items to history for {site_id} (week ending {week_ending})")
+        except Exception as e:
+            logger.warning(f"Failed to save item history for {site_id}: {e}")
+
+        # Refresh ABC-XYZ classifications (uses item history data)
+        try:
+            classified = refresh_classifications(site_id)
+            if classified > 0:
+                logger.info(f"Refreshed {classified} classifications for {site_id}")
+        except Exception as e:
+            logger.warning(f"Failed to refresh classifications for {site_id}: {e}")
 
         return {
             "success": True,

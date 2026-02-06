@@ -15,16 +15,17 @@ def create_file(
     file_type: str,
     file_size: int,
     site_id: Optional[str] = None,
-    collection: str = "knowledge_base"
+    collection: str = "knowledge_base",
+    content_hash: Optional[str] = None
 ) -> Dict[str, Any]:
     """Create a new file record."""
     now = datetime.utcnow().isoformat()
 
     with get_db() as conn:
         conn.execute("""
-            INSERT INTO files (id, filename, original_path, current_path, file_type, file_size, site_id, collection, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (file_id, filename, original_path, original_path, file_type, file_size, site_id, collection, FileStatus.PENDING.value, now, now))
+            INSERT INTO files (id, filename, original_path, current_path, file_type, file_size, site_id, collection, status, content_hash, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (file_id, filename, original_path, original_path, file_type, file_size, site_id, collection, FileStatus.PENDING.value, content_hash, now, now))
 
     return get_file(file_id)
 

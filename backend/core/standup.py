@@ -43,10 +43,15 @@ def get_llm_response(prompt: str, system: str = "", temperature: float = 0.7) ->
     return llm.chat(prompt, system=system if system else None, temperature=temperature)
 
 
-def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
+def web_search(query: str, num_results: int = 5, timeout: int = 5) -> List[Dict[str, str]]:
     """
     Search the web for relevant content.
     Uses DuckDuckGo Instant Answer API (no API key required).
+
+    Args:
+        query: Search query
+        num_results: Max results to return
+        timeout: Request timeout in seconds (default 5, fail fast)
     """
     try:
         # DuckDuckGo Instant Answer API
@@ -58,7 +63,7 @@ def web_search(query: str, num_results: int = 5) -> List[Dict[str, str]]:
                 "no_html": 1,
                 "skip_disambig": 1
             },
-            timeout=10
+            timeout=timeout
         )
         response.raise_for_status()
         data = response.json()
@@ -121,17 +126,25 @@ def generate_safety_moment(topic_hint: Optional[str] = None) -> Dict[str, Any]:
     # Build context from RAG results
     rag_context = ""
     sources = []
-    for r in rag_results:
-        rag_context += f"\n- {r['text'][:500]}"
-        if r.get("metadata", {}).get("source_file"):
-            sources.append(r["metadata"]["source_file"])
+    if rag_results:
+        for r in rag_results:
+            rag_context += f"\n- {r['text'][:500]}"
+            if r.get("metadata", {}).get("source_file"):
+                sources.append(r["metadata"]["source_file"])
+    else:
+        logger.warning("No training materials found for safety moment - knowledge base may be empty")
+        rag_context = "\n(No training materials available - using general food safety knowledge)"
 
-    # Get current food safety news
-    web_results = web_search("food safety news tips 2024")
+    # Get current food safety news (use current year)
+    current_year = datetime.now().year
+    web_results = web_search(f"food safety news tips {current_year}", timeout=5)
     web_context = ""
     for r in web_results[:2]:
         if r.get("snippet"):
             web_context += f"\n- {r['snippet'][:300]}"
+
+    if not web_context:
+        web_context = "\n(Web search unavailable)"
 
     # Generate with LLM
     topic_instruction = ""

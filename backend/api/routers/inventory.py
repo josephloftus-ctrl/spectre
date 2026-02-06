@@ -10,6 +10,7 @@ from backend.core.database import (
     FileStatus, list_files, get_file,
     list_unit_scores, get_unit_score, get_score_history
 )
+from backend.core.db.base import get_db
 
 
 # ============== Response Models ==============
@@ -20,7 +21,8 @@ class SiteSummaryResponse(BaseModel):
     latest_total: float
     delta_pct: float
     issue_count: int
-    last_updated: str
+    last_updated: str  # When file was processed/uploaded
+    inventory_date: Optional[str] = None  # When inventory was actually taken (from Excel)
     health_score: int = 0
     health_status: str = "clean"
     room_flag_count: int = 0
@@ -68,7 +70,8 @@ class SiteDetailResponse(BaseModel):
     site: str
     latest_total: float
     delta_pct: float
-    latest_date: str
+    latest_date: str  # When file was processed/uploaded
+    inventory_date: Optional[str] = None  # When inventory was actually taken
     health_score: int
     health_status: str
     item_count: int
@@ -110,11 +113,25 @@ def get_inventory_summary() -> InventorySummaryResponse:
     """
     Returns global stats and list of sites with their health.
     Now reads from unit_scores database table instead of filesystem.
+    Includes inventory_date (when count was taken) separate from last_updated (when processed).
     """
     scores = list_unit_scores(limit=500)
 
     if not scores:
         return {"sites": [], "global_value": 0, "active_sites": 0, "total_issues": 0}
+
+    # Build a lookup of file_id -> inventory_date
+    file_ids = [s["file_id"] for s in scores if s.get("file_id")]
+    inventory_dates = {}
+    if file_ids:
+        with get_db() as conn:
+            placeholders = ",".join("?" for _ in file_ids)
+            cursor = conn.execute(
+                f"SELECT id, inventory_date FROM files WHERE id IN ({placeholders})",
+                file_ids
+            )
+            for row in cursor.fetchall():
+                inventory_dates[row["id"]] = row["inventory_date"]
 
     site_summaries = []
     global_value = 0.0
@@ -129,12 +146,17 @@ def get_inventory_summary() -> InventorySummaryResponse:
             if prev_value > 0:
                 delta_pct = round(((curr_value - prev_value) / prev_value) * 100, 1)
 
+        # Get inventory_date from linked file
+        file_id = score.get("file_id")
+        inv_date = inventory_dates.get(file_id) if file_id else None
+
         site_summaries.append({
             "site": score["site_id"],
             "latest_total": score["total_value"],
             "delta_pct": delta_pct,
             "issue_count": score["item_flag_count"],
-            "last_updated": score["created_at"],
+            "last_updated": score["created_at"],  # When file was processed
+            "inventory_date": inv_date,  # When count was actually taken
             # New fields for comprehensive scoring
             "health_score": score.get("score", 0),
             "health_status": score.get("status", "clean"),
@@ -170,11 +192,25 @@ def get_site_detail(site_id: str) -> SiteDetailResponse:
         if prev_value > 0:
             delta_pct = round(((curr_value - prev_value) / prev_value) * 100, 1)
 
+    # Get inventory_date from linked file
+    inv_date = None
+    file_id = score.get("file_id")
+    if file_id:
+        with get_db() as conn:
+            cursor = conn.execute(
+                "SELECT inventory_date FROM files WHERE id = ?",
+                (file_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                inv_date = row["inventory_date"]
+
     return {
         "site": site_id,
         "latest_total": score["total_value"],
         "delta_pct": delta_pct,
-        "latest_date": score["created_at"],
+        "latest_date": score["created_at"],  # When processed
+        "inventory_date": inv_date,  # When count was taken
         # Health scoring
         "health_score": score.get("score", 0),
         "health_status": score.get("status", "clean"),

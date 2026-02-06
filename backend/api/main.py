@@ -42,6 +42,8 @@ from backend.api.routers import (
     templates_router,
     history_router,
     rooms_router,
+    classifications_router,
+    ai_router,
 )
 
 # Menu Planning module
@@ -120,6 +122,12 @@ app.include_router(memory_router)
 
 # History tracking
 app.include_router(history_router)
+
+# Classifications (ABC-XYZ)
+app.include_router(classifications_router)
+
+# AI proxy (Claude)
+app.include_router(ai_router)
 
 # Menu Planning
 app.include_router(menu_planning_router, prefix="/api")

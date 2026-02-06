@@ -28,6 +28,14 @@ class Settings:
     # Database
     DB_PATH: str = os.environ.get("SPECTRE_DB_PATH", "data/spectre.db")
 
+    # Claude API (server-side proxy)
+    CLAUDE_API_KEY: str = os.environ.get("CLAUDE_API_KEY", "")
+    CLAUDE_MODEL: str = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
+    CLAUDE_API_URL: str = "https://api.anthropic.com/v1/messages"
+
+    # API key for protecting destructive endpoints (optional)
+    API_KEY: str = os.environ.get("SPECTRE_API_KEY", "")
+
     # File storage
     DATA_DIR: str = os.environ.get("SPECTRE_DATA_DIR", "data")
 

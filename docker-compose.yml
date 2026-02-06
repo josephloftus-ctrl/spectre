@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-spectre}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spectre}
+      POSTGRES_DB: ${POSTGRES_DB:-spectre}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spectre"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      SPECTRE_DB_PATH: /app/data/spectre.db
+      SPECTRE_DATA_DIR: /app/data
+      OLLAMA_URL: http://ollama:11434
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8090,http://localhost:5173}
+      # Uncomment when switching to PostgreSQL (Phase 3):
+      # DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-spectre}:${POSTGRES_PASSWORD:-spectre}@postgres:5432/${POSTGRES_DB:-spectre}
+    volumes:
+      - spectre_data:/app/data
+    depends_on:
+      ollama:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-8090}:8090"
+    depends_on:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pull models on startup
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /bin/ollama serve &
+        sleep 5
+        ollama pull nomic-embed-text:v1.5
+        ollama pull granite4:3b
+        wait
+
+volumes:
+  postgres_data:
+  spectre_data:
+  ollama_data:

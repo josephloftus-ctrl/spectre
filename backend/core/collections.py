@@ -29,6 +29,18 @@ COLLECTIONS = {
         "color": "amber",
         "type": "static",  # Rarely changes, company reference
     },
+    "training_corpus": {
+        "description": "Ingested training documents and SOPs",
+        "icon": "graduation-cap",
+        "color": "blue",
+        "type": "static",  # Training materials
+    },
+    "culinart_bible": {
+        "description": "Culinart reference materials and procedures",
+        "icon": "book-open",
+        "color": "orange",
+        "type": "static",  # Reference documents
+    },
     "inventory": {
         "description": "Uploaded inventory documents and count sheets",
         "icon": "package",
@@ -49,8 +61,9 @@ COLLECTIONS = {
     }
 }
 
-# Default collection for backwards compatibility
-DEFAULT_COLLECTION = "knowledge_base"
+# Default collection for search and general use
+# Note: "knowledge_base" is empty; "training_corpus" has 1333 ingested documents
+DEFAULT_COLLECTION = "training_corpus"
 
 # ChromaDB persistence directory
 CHROMA_DIR = Path(__file__).resolve().parents[2] / "data" / "embeddings" / "chroma"
