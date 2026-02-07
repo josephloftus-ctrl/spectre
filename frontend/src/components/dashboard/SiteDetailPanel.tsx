@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Loader2, AlertTriangle, FileText, MapPin, DollarSign, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Loader2, AlertTriangle, FileText, MapPin, DollarSign, TrendingUp, TrendingDown, Minus, Download } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   fetchSiteScore,
   fetchSiteFiles,
+  fetchScoreHistory,
+  exportInventory,
+  saveBlobAsFile,
   type UnitScoreDetail,
   type FileRecord,
   formatSiteName,
@@ -15,7 +19,9 @@ import {
   getTrendColor,
 } from '@/components/ui/status-indicator'
 import { cn } from '@/lib/utils'
+import { TrendChart } from '@/components/TrendChart'
 import { ClassificationPanel } from './ClassificationPanel'
+import { WeekComparisonPanel } from './WeekComparisonPanel'
 
 interface SiteDetailPanelProps {
   siteId: string
@@ -50,20 +56,36 @@ function formatDate(dateStr: string): string {
 export function SiteDetailPanel({ siteId }: SiteDetailPanelProps) {
   const [score, setScore] = useState<UnitScoreDetail | null>(null)
   const [files, setFiles] = useState<FileRecord[]>([])
+  const [trendData, setTrendData] = useState<{ label: string; value: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     async function loadData() {
       setLoading(true)
       setError(null)
       try {
-        const [scoreData, filesData] = await Promise.all([
+        const [scoreData, filesData, historyData] = await Promise.all([
           fetchSiteScore(siteId),
           fetchSiteFiles(siteId),
+          fetchScoreHistory(siteId, 12).catch(() => null),
         ])
         setScore(scoreData)
-        setFiles(filesData.files.slice(0, 5)) // Show recent 5 files
+        setFiles(filesData.files.slice(0, 5))
+
+        if (historyData?.history && historyData.history.length >= 2) {
+          setTrendData(
+            historyData.history
+              .map(h => ({
+                label: new Date(h.snapshot_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                value: h.total_value,
+              }))
+              .reverse()
+          )
+        } else {
+          setTrendData([])
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load site details')
       } finally {
@@ -100,22 +122,45 @@ export function SiteDetailPanel({ siteId }: SiteDetailPanelProps) {
   const TrendIcon = score.trend === 'up' ? TrendingUp :
     score.trend === 'down' ? TrendingDown : Minus
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const blob = await exportInventory(siteId)
+      const safeName = formatSiteName(siteId).replace(/\s+/g, '_')
+      saveBlobAsFile(blob, `${safeName}_inventory.xlsx`)
+    } catch (err) {
+      console.error('Export failed:', err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">{formatSiteName(siteId)}</h3>
-        <div className="flex items-center gap-2 mt-1">
-          <StatusIndicator status={score.status} size="sm" />
-          <span className="text-sm text-muted-foreground">
-            {getStatusLabel(score.status)}
-          </span>
-          {score.trend && (
-            <span className={cn('flex items-center gap-0.5 text-xs', getTrendColor(score.trend))}>
-              <TrendIcon className="h-3 w-3" />
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">{formatSiteName(siteId)}</h3>
+          <div className="flex items-center gap-2 mt-1">
+            <StatusIndicator status={score.status} size="sm" />
+            <span className="text-sm text-muted-foreground">
+              {getStatusLabel(score.status)}
             </span>
-          )}
+            {score.trend && (
+              <span className={cn('flex items-center gap-0.5 text-xs', getTrendColor(score.trend))}>
+                <TrendIcon className="h-3 w-3" />
+              </span>
+            )}
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+          ) : (
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+          )}
+          Export
+        </Button>
       </div>
 
       {/* Stats */}
@@ -139,6 +184,24 @@ export function SiteDetailPanel({ siteId }: SiteDetailPanelProps) {
           </div>
         </Card>
       </div>
+
+      {/* Value Trend */}
+      {trendData.length >= 2 && (
+        <div className="space-y-2">
+          <h4 className="font-medium">Value Trend</h4>
+          <Card className="p-3">
+            <TrendChart
+              data={trendData}
+              height={100}
+              color="blue"
+              formatValue={(v) => formatCurrency(v)}
+            />
+          </Card>
+        </div>
+      )}
+
+      {/* Week-over-Week Comparison */}
+      <WeekComparisonPanel siteId={siteId} />
 
       {/* Flagged Items */}
       {score.flagged_items && score.flagged_items.length > 0 && (

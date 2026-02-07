@@ -306,7 +306,7 @@ export async function getChatMessages(sessionId: string): Promise<ChatMessage[]>
   return db.chatMessages.where('sessionId').equals(sessionId).sortBy('createdAt')
 }
 
-export async function addChatMessage(sessionId: string, role: 'user' | 'assistant', content: string, model?: string, provider?: 'ollama' | 'claude'): Promise<ChatMessage> {
+export async function addChatMessage(sessionId: string, role: 'user' | 'assistant', content: string, model?: string): Promise<ChatMessage> {
   const msg: ChatMessage = {
     id: crypto.randomUUID(),
     sessionId,
@@ -314,7 +314,6 @@ export async function addChatMessage(sessionId: string, role: 'user' | 'assistan
     content,
     createdAt: new Date().toISOString(),
     model,
-    provider
   }
   await db.chatMessages.add(msg)
   await db.chatSessions.update(sessionId, {

@@ -128,7 +128,6 @@ export interface ChatMessage {
   createdAt: string
   // For tracking which model responded
   model?: string
-  provider?: 'ollama' | 'claude'
 }
 
 // Memory context - extracted insights from past conversations

@@ -5,7 +5,8 @@ import {
   DashboardPage, InboxPage, IssuesPage, InventoryPage,
   NotesPage, SettingsPage, SitePage, AssistantPage, SearchPage,
   PurchaseMatchDetailPage, PurchaseMatchCategoryPage,
-  CartPage, CountSessionPage, OffCatalogPage, RoomsPage
+  CartPage, CountSessionPage, OffCatalogPage, RoomsPage,
+  MenuPlanningPage
 } from '@/pages'
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
           <Route path="/count" element={<CountSessionPage />} />
           <Route path="/off-catalog" element={<OffCatalogPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
+          <Route path="/menu-planning" element={<MenuPlanningPage />} />
           <Route path="/notes" element={<NotesPage />} />
           <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/search" element={<SearchPage />} />

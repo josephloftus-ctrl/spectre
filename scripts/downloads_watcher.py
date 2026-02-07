@@ -42,8 +42,6 @@ except ImportError:
 # Configuration
 WATCH_DIR = Path(os.environ.get("SPECTRE_WATCH_DIR", os.path.expanduser("~/Downloads")))
 API_URL = os.environ.get("SPECTRE_API_URL", "http://localhost:8000")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-
 # Sort destinations
 SORT_BASE = Path(os.environ.get("SPECTRE_SORT_BASE", os.path.expanduser("~/Documents/Sorted")))
 SORT_FOLDERS = {
@@ -175,59 +173,26 @@ def is_spectre_inventory(filepath: Path) -> Tuple[bool, Optional[Dict[str, Any]]
         return False, None
 
 
-def categorize_file_with_ai(filepath: Path) -> str:
+def categorize_file(filepath: Path) -> Optional[str]:
     """
-    Use Ollama to categorize a file based on its name.
+    Categorize a file based on its name using pattern matching.
     Returns category: invoices, receipts, training, reports, contracts, other_work
+    Returns None for files that don't match any work pattern.
     """
     filename = filepath.name.lower()
 
-    # Quick pattern matching first (faster than AI)
-    if any(kw in filename for kw in ['invoice', 'inv_', 'inv-']):
+    if any(kw in filename for kw in ['invoice', 'inv_', 'inv-', 'billing', 'charge']):
         return "invoices"
-    if any(kw in filename for kw in ['receipt', 'rcpt', 'payment']):
+    if any(kw in filename for kw in ['receipt', 'rcpt', 'payment', 'confirmation']):
         return "receipts"
-    if any(kw in filename for kw in ['training', 'manual', 'guide', 'tutorial', 'instruction']):
+    if any(kw in filename for kw in ['training', 'manual', 'guide', 'tutorial', 'instruction', 'sop', 'procedure']):
         return "training"
-    if any(kw in filename for kw in ['report', 'summary', 'analysis']):
+    if any(kw in filename for kw in ['report', 'summary', 'analysis', 'audit', 'review']):
         return "reports"
-    if any(kw in filename for kw in ['contract', 'agreement', 'terms']):
+    if any(kw in filename for kw in ['contract', 'agreement', 'terms', 'nda']):
         return "contracts"
-
-    # Use AI for ambiguous files
-    try:
-        prompt = f"""Categorize this file based on its name into exactly one category.
-Filename: {filepath.name}
-
-Categories:
-- invoices (billing, invoices, charges)
-- receipts (payment receipts, confirmations)
-- training (manuals, guides, tutorials, training materials)
-- reports (reports, summaries, analyses)
-- contracts (contracts, agreements, legal documents)
-- other_work (other work-related documents)
-- personal (not work-related, personal files)
-
-Reply with ONLY the category name, nothing else."""
-
-        response = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={
-                "model": "granite3.2:3b",
-                "prompt": prompt,
-                "stream": False,
-            },
-            timeout=30
-        )
-
-        if response.status_code == 200:
-            result = response.json().get("response", "").strip().lower()
-            if result in SORT_FOLDERS:
-                return result
-            if result == "personal":
-                return None  # Don't sort personal files
-    except Exception as e:
-        logger.debug(f"AI categorization failed: {e}")
+    if any(kw in filename for kw in ['order', 'purchase', 'vendor', 'inventory', 'menu', 'schedule', 'roster']):
+        return "other_work"
 
     return "other_work"
 
@@ -351,7 +316,7 @@ def process_file(filepath: Path):
             return
 
     # Not a Spectre file - categorize and sort
-    category = categorize_file_with_ai(filepath)
+    category = categorize_file(filepath)
 
     if category is None:
         logger.info(f"Skipping personal file: {filepath.name}")

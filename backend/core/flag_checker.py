@@ -202,6 +202,7 @@ def calculate_unit_score(rows: list[dict], gl_code_key: str = None) -> dict:
     for row in rows:
         # Get item details
         item_desc = ""
+        sku = ""
         qty = 0
         uom = ""
         total = 0.0
@@ -212,6 +213,8 @@ def calculate_unit_score(rows: list[dict], gl_code_key: str = None) -> dict:
 
             if "description" in key_lower or "item" in key_lower:
                 item_desc = str(value) if value else ""
+            elif key_lower in ("dist #", "sku", "item number", "item_number"):
+                sku = str(value) if value else ""
             elif "quantity" in key_lower or key_lower == "qty":
                 try:
                     qty = float(value) if value else 0
@@ -245,6 +248,7 @@ def calculate_unit_score(rows: list[dict], gl_code_key: str = None) -> dict:
             total_score += points
             item_flags.append({
                 "item": item_desc,
+                "sku": sku,
                 "qty": qty,
                 "uom": uom,
                 "total": total,

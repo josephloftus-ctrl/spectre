@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, Loader2, Camera, AlertTriangle, DollarSign, Building2 } from 'lucide-react'
-import { fetchScores, refreshScores, createScoreSnapshot, UnitScore, ScoreStatus } from '@/lib/api'
+import { fetchScores, fetchScoreHistory, refreshScores, createScoreSnapshot, UnitScore, ScoreStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getStatusLabel } from '@/components/ui/status-indicator'
 import { SiteCard, SiteDetailPanel } from '@/components/dashboard'
@@ -26,6 +26,7 @@ export function InventoryPage() {
   const [snapshotting, setSnapshotting] = useState(false)
   const [filter, setFilter] = useState<FilterStatus>('all')
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
+  const [sparklines, setSparklines] = useState<Record<string, number[]>>({})
   const contextPanel = useContextPanel()
 
   const loadScores = useCallback(async () => {
@@ -44,6 +45,30 @@ export function InventoryPage() {
   useEffect(() => {
     loadScores()
   }, [loadScores])
+
+  // Fetch sparkline data for all sites after units load
+  useEffect(() => {
+    if (units.length === 0) return
+
+    const loadSparklines = async () => {
+      const results = await Promise.allSettled(
+        units.map(u => fetchScoreHistory(u.site_id, 8))
+      )
+
+      const data: Record<string, number[]> = {}
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled' && result.value.history.length >= 2) {
+          // History comes newest-first, reverse for chronological sparkline
+          data[units[i].site_id] = result.value.history
+            .map(h => h.total_value)
+            .reverse()
+        }
+      })
+      setSparklines(data)
+    }
+
+    loadSparklines()
+  }, [units])
 
   const handleRefresh = async () => {
     try {
@@ -221,6 +246,7 @@ export function InventoryPage() {
               site={unit}
               selected={selectedSiteId === unit.site_id}
               onClick={() => handleSiteClick(unit.site_id)}
+              sparklineValues={sparklines[unit.site_id]}
             />
           ))}
         </div>

@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import { useChat, useNotes } from '@/hooks'
 import { fetchSummary } from '@/lib/api'
-import { checkAIStatus, STANDARD_MODEL } from '@/lib/ollama'
+import { checkAIStatus } from '@/lib/ai'
 import { cn } from '@/lib/utils'
 import { getMemory, deleteMemory, type MemoryItem } from '@/lib/db'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -764,8 +764,8 @@ export function AssistantPage() {
             <Cpu className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
             <h2 className="text-lg font-semibold mb-2">AI Not Connected</h2>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              The AI service (Ollama with {STANDARD_MODEL}) is not available.
-              Make sure Ollama is running.
+              The Claude API is not configured or reachable.
+              Check the CLAUDE_API_KEY in your backend settings.
             </p>
             <Button onClick={() => navigate('/settings')}>
               <Settings className="h-4 w-4 mr-2" />
@@ -785,7 +785,7 @@ export function AssistantPage() {
           Assistant
         </h1>
         <p className="text-muted-foreground text-sm">
-          Powered by {STANDARD_MODEL}
+          Powered by Claude
         </p>
       </div>
 

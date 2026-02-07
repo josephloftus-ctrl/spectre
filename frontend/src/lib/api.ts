@@ -36,7 +36,6 @@ export interface FileRecord {
     status: FileStatus;
     error_message: string | null;
     parsed_data: string | null;
-    embedding_id: string | null;
     inventory_date: string | null;
     created_at: string;
     updated_at: string;
@@ -69,7 +68,6 @@ export interface SearchResult {
 export interface SystemStats {
     files: Record<FileStatus, number>;
     jobs: Record<JobStatus, number>;
-    embeddings: number;
 }
 
 export interface WorkerStatus {
@@ -81,13 +79,6 @@ export interface WorkerStatus {
     }>;
 }
 
-export interface EmbeddingStats {
-    available: boolean;
-    collection?: string;
-    total_chunks?: number;
-    model?: string;
-    error?: string;
-}
 
 // ============== API Client ==============
 
@@ -141,15 +132,11 @@ export const retryFile = async (fileId: string): Promise<FileRecord> => {
     return data.file;
 };
 
-export const deleteFile = async (fileId: string): Promise<{ success: boolean; embeddings_deleted: number }> => {
+export const deleteFile = async (fileId: string): Promise<{ success: boolean }> => {
     const { data } = await api.delete(`/files/${fileId}`);
     return data;
 };
 
-export const reembedFile = async (fileId: string): Promise<{ success: boolean; job_id: string }> => {
-    const { data } = await api.post(`/files/${fileId}/reembed`);
-    return data;
-};
 
 export const downloadFile = async (fileId: string): Promise<Blob> => {
     const { data } = await api.get(`/files/${fileId}/download`, {
@@ -241,26 +228,6 @@ export const searchDocuments = async (
     return data;
 };
 
-export const resetEmbeddings = async (): Promise<{ success: boolean; message: string }> => {
-    const { data } = await api.post('/embeddings/reset');
-    return data;
-};
-
-export const reindexEmbeddings = async (): Promise<{ success: boolean; message: string; queued_count: number }> => {
-    const { data } = await api.post('/embeddings/reindex');
-    return data;
-};
-
-export const findSimilar = async (
-    fileId: string,
-    chunk: number = 0,
-    limit: number = 5
-): Promise<{ results: SearchResult[]; count: number }> => {
-    const { data } = await api.get(`/search/similar/${fileId}`, {
-        params: { chunk, limit }
-    });
-    return data;
-};
 
 // ============== Stats API ==============
 
@@ -274,10 +241,6 @@ export const fetchWorkerStatus = async (): Promise<WorkerStatus> => {
     return data;
 };
 
-export const fetchEmbeddingStats = async (): Promise<EmbeddingStats> => {
-    const { data } = await api.get('/embeddings/stats');
-    return data;
-};
 
 // ============== Analysis API ==============
 
@@ -379,12 +342,14 @@ export interface UnitScore {
 
 export interface FlaggedItem {
     item: string;
+    sku?: string;
     qty: number;
     uom: string;
     total: number;
     flags: FlagType[];
     points: number;
     location: string;
+    abc_class?: 'A' | 'B' | 'C' | null;
 }
 
 export interface UnitScoreDetail extends UnitScore {
@@ -740,93 +705,6 @@ export const removeIgnoredItem = async (
     return data;
 };
 
-// ============== Collections API ==============
-
-export interface CollectionInfo {
-    name: string;
-    description: string;
-    icon: string;
-    color: string;
-    type: 'static' | 'expandable' | 'dynamic';
-    chunk_count: number;
-    exists: boolean;
-}
-
-export interface CollectionStats extends CollectionInfo {
-    file_count: number;
-    sites: string[];
-    date_range: {
-        earliest: string | null;
-        latest: string | null;
-    };
-}
-
-export const fetchCollections = async (): Promise<{ collections: CollectionInfo[]; count: number }> => {
-    const { data } = await api.get('/collections');
-    return data;
-};
-
-export const fetchCollectionStats = async (name: string): Promise<CollectionStats> => {
-    const { data } = await api.get(`/collections/${name}`);
-    return data;
-};
-
-export const migrateCollections = async (): Promise<{ success: boolean; message: string; migrated: number }> => {
-    const { data } = await api.post('/collections/migrate');
-    return data;
-};
-
-export const initCollections = async (): Promise<{ success: boolean; message: string; collections: CollectionInfo[] }> => {
-    const { data } = await api.post('/collections/init');
-    return data;
-};
-
-export const searchUnified = async (
-    query: string,
-    params?: {
-        limit?: number;
-        collections?: string[];
-        dateFrom?: string;
-        dateTo?: string;
-        siteId?: string;
-    }
-): Promise<{ results: SearchResult[]; count: number; query: string }> => {
-    const formData = new FormData();
-    formData.append('query', query);
-    if (params?.limit) formData.append('limit', params.limit.toString());
-    if (params?.collections?.length) formData.append('collections', params.collections.join(','));
-    if (params?.dateFrom) formData.append('date_from', params.dateFrom);
-    if (params?.dateTo) formData.append('date_to', params.dateTo);
-    if (params?.siteId) formData.append('site_id', params.siteId);
-
-    const { data } = await api.post('/search/unified', formData);
-    return data;
-};
-
-export const searchCollection = async (
-    collectionName: string,
-    query: string,
-    params?: {
-        limit?: number;
-        fileId?: string;
-        siteId?: string;
-        dateFrom?: string;
-        dateTo?: string;
-        sortBy?: 'relevance' | 'date_desc' | 'date_asc' | 'site';
-    }
-): Promise<{ results: SearchResult[]; count: number; collection: string }> => {
-    const formData = new FormData();
-    formData.append('query', query);
-    if (params?.limit) formData.append('limit', params.limit.toString());
-    if (params?.fileId) formData.append('file_id', params.fileId);
-    if (params?.siteId) formData.append('site_id', params.siteId);
-    if (params?.dateFrom) formData.append('date_from', params.dateFrom);
-    if (params?.dateTo) formData.append('date_to', params.dateTo);
-    if (params?.sortBy) formData.append('sort_by', params.sortBy);
-
-    const { data } = await api.post(`/search/${collectionName}`, formData);
-    return data;
-};
 
 // ============== Day At A Glance API ==============
 
@@ -1610,5 +1488,167 @@ export const fetchItemHistory = async (
     const { data } = await api.get(`/history/${siteId}/items/${encodeURIComponent(sku)}`, {
         params: weeks ? { weeks } : undefined
     });
+    return data;
+};
+
+// ============== Menu Planning API ==============
+
+export interface MenuUnit {
+    id: string;
+    name: string;
+    station_groups: Record<string, string[]>;
+    active_stations: string[];
+    settings: Record<string, unknown>;
+    created_at: string;
+}
+
+export interface MenuUnitCreate {
+    id: string;
+    name: string;
+    station_groups: Record<string, string[]>;
+    active_stations: string[];
+    settings: Record<string, unknown>;
+}
+
+export interface CycleMenuSummary {
+    id: number;
+    unit_id: string;
+    month: string;
+    filename: string;
+    uploaded_at: string;
+    status: string;
+    item_count: number;
+}
+
+export interface PromoPacket {
+    id: number;
+    month: string;
+    theme: string;
+    filename: string;
+    uploaded_at: string;
+    status: string;
+    error_message?: string;
+    recipes: PromoRecipe[];
+}
+
+export interface PromoRecipe {
+    id: number;
+    master_ref: string;
+    name: string;
+    station?: string;
+    station_groups: string[];
+    calories?: number;
+    cost?: number;
+    dietary: string[];
+    theme: string;
+    keywords: string[];
+}
+
+export interface RecommendationRun {
+    id: number;
+    cycle_menu_id: number;
+    run_at: string;
+    result_count: number;
+    flag_count: number;
+}
+
+export interface RecommendationDetail {
+    id: number;
+    cycle_menu_id: number;
+    run_at: string;
+    config_snapshot: Record<string, unknown>;
+    results: Array<{
+        date: string;
+        day_of_week: string;
+        current_item: Record<string, unknown>;
+        promo_recipe: Record<string, unknown>;
+        scores: Record<string, number>;
+        total_score: number;
+        why: string;
+    }>;
+    flags: {
+        theme_collisions: Array<Record<string, unknown>>;
+        weekday_repeats: Array<Record<string, unknown>>;
+        ingredient_collisions: Array<Record<string, unknown>>;
+        total_flags: number;
+    };
+}
+
+// Units
+export const fetchMenuUnits = async (): Promise<MenuUnit[]> => {
+    const { data } = await api.get('/menu-planning/units');
+    return data;
+};
+
+export const createMenuUnit = async (unit: MenuUnitCreate): Promise<MenuUnit> => {
+    const { data } = await api.post('/menu-planning/units', unit);
+    return data;
+};
+
+export const updateMenuUnit = async (unitId: string, unit: MenuUnitCreate): Promise<MenuUnit> => {
+    const { data } = await api.put(`/menu-planning/units/${encodeURIComponent(unitId)}`, unit);
+    return data;
+};
+
+// Cycle Menus
+export const fetchCycleMenus = async (unitId?: string, month?: string): Promise<CycleMenuSummary[]> => {
+    const { data } = await api.get('/menu-planning/cycle-menus', {
+        params: { unit_id: unitId, month }
+    });
+    return data;
+};
+
+export const uploadCycleMenu = async (unitId: string, month: string, file: File): Promise<{ id: number; status: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const { data } = await api.post(`/menu-planning/cycle-menus/upload?unit_id=${encodeURIComponent(unitId)}&month=${encodeURIComponent(month)}`, form);
+    return data;
+};
+
+export const deleteCycleMenu = async (menuId: number): Promise<void> => {
+    await api.delete(`/menu-planning/cycle-menus/${menuId}`);
+};
+
+// Promos
+export const fetchPromos = async (month?: string): Promise<PromoPacket[]> => {
+    const { data } = await api.get('/menu-planning/promos', {
+        params: { month }
+    });
+    return data;
+};
+
+export const uploadPromo = async (month: string, file: File): Promise<{ id: number; theme: string; status: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const { data } = await api.post(`/menu-planning/promos/upload?month=${encodeURIComponent(month)}`, form);
+    return data;
+};
+
+export const deletePromo = async (packetId: number): Promise<void> => {
+    await api.delete(`/menu-planning/promos/${packetId}`);
+};
+
+// Recommendations
+export const fetchRecommendations = async (): Promise<RecommendationRun[]> => {
+    const { data } = await api.get('/menu-planning/recommendations');
+    return data;
+};
+
+export const generateRecommendations = async (
+    unitId: string, month: string, minScore?: number, maxPerDay?: number
+): Promise<{ id: number; count: number; flags: number }> => {
+    const { data } = await api.post('/menu-planning/recommendations/generate', {
+        unit_id: unitId, month, min_score: minScore, max_per_day: maxPerDay
+    });
+    return data;
+};
+
+export const fetchRecommendationDetail = async (recId: number): Promise<RecommendationDetail> => {
+    const { data } = await api.get(`/menu-planning/recommendations/${recId}`);
+    return data;
+};
+
+export const exportRecommendation = async (recId: number): Promise<{ calendar: string; flags: string }> => {
+    const { data } = await api.get(`/menu-planning/recommendations/${recId}/export`);
     return data;
 };

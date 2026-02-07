@@ -1,12 +1,13 @@
 """
 Help Desk API router.
+
+Uses training corpus text loaded directly into Claude's context window
+instead of embedding-based RAG search.
 """
 from fastapi import APIRouter, HTTPException, Form
-import requests
 
-from backend.core.config import settings
-from backend.core.embeddings import search as rag_search
-from backend.core.corpus import get_corpus_stats, ingest_training_corpus
+from backend.core import llm
+from backend.core.corpus import load_corpus, get_corpus_stats, get_corpus_text
 
 router = APIRouter(prefix="/api/helpdesk", tags=["Help Desk"])
 
@@ -17,33 +18,53 @@ def helpdesk_ask(
     include_sources: bool = Form(True)
 ):
     """
-    Ask a question to the Help Desk RAG system.
-    Searches training corpus and synthesizes an answer.
+    Ask a question using training materials as context.
+    Loads relevant corpus text into Claude's context window.
     """
-    results = rag_search(
-        query=question,
-        limit=5,
-        collection_name="knowledge_base"
-    )
-
-    if not results:
+    docs = load_corpus()
+    if not docs:
         return {
-            "answer": "I couldn't find relevant information in the training materials for your question.",
+            "answer": "No training materials are available. Please add documents to the Training/ directory.",
             "sources": [],
             "confidence": "low"
         }
 
+    # Build context from corpus — use keyword relevance to pick best docs
+    question_lower = question.lower()
+    question_words = set(question_lower.split())
+
+    # Score each doc by keyword overlap with the question
+    scored_docs = []
+    for doc in docs:
+        doc_lower = doc["text"].lower()
+        overlap = sum(1 for w in question_words if w in doc_lower and len(w) > 3)
+        scored_docs.append((overlap, doc))
+
+    # Sort by relevance (highest overlap first), take top docs that fit context
+    scored_docs.sort(key=lambda x: x[0], reverse=True)
+
     context_parts = []
     sources = []
-    for r in results:
-        context_parts.append(r["text"])
-        source_file = r.get("metadata", {}).get("source_file", "")
-        if source_file and source_file not in sources:
-            sources.append(source_file)
+    total_chars = 0
+    max_context_chars = 100_000  # ~25K tokens, leaving room for prompt + response
+
+    for _, doc in scored_docs:
+        if total_chars + doc["size"] > max_context_chars:
+            # If this doc would exceed budget, try truncating it
+            remaining = max_context_chars - total_chars
+            if remaining > 500:
+                context_parts.append(f"--- {doc['file']} (truncated) ---\n{doc['text'][:remaining]}")
+                sources.append(doc["file"])
+            break
+        context_parts.append(f"--- {doc['file']} ---\n{doc['text']}")
+        sources.append(doc["file"])
+        total_chars += doc["size"]
 
     context = "\n\n".join(context_parts)
 
     try:
+        system = "You are a helpful assistant answering questions about food service operations, safety, and HR policies based on company training materials."
+
         prompt = f"""Based on the following training materials, answer this question:
 
 QUESTION: {question}
@@ -60,24 +81,9 @@ Instructions:
 
 ANSWER:"""
 
-        response = requests.post(
-            f"{settings.OLLAMA_URL}/api/chat",
-            json={
-                "model": settings.LLM_MODEL,
-                "messages": [
-                    {"role": "system", "content": "You are a helpful assistant answering questions about food service operations, safety, and HR policies based on company training materials."},
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False,
-                "options": {"temperature": 0.3}
-            },
-            timeout=60
-        )
+        answer = llm.chat(prompt, system=system, temperature=0.3)
 
-        if response.ok:
-            data = response.json()
-            answer = data.get("message", {}).get("content", "").strip()
-        else:
+        if not answer:
             answer = "Unable to generate answer. Please try again."
 
     except Exception as e:
@@ -85,14 +91,15 @@ ANSWER:"""
 
     result = {
         "answer": answer,
-        "confidence": "high" if len(results) >= 3 else "medium" if len(results) >= 1 else "low"
+        "confidence": "high" if len(sources) >= 3 else "medium" if len(sources) >= 1 else "low"
     }
 
     if include_sources:
-        result["sources"] = sources
+        result["sources"] = sources[:5]
         result["source_snippets"] = [
-            {"file": r.get("metadata", {}).get("source_file", ""), "text": r["text"][:200]}
-            for r in results[:3]
+            {"file": doc["file"], "text": doc["text"][:200]}
+            for _, doc in scored_docs[:3]
+            if doc["file"] in sources
         ]
 
     return result
@@ -104,27 +111,44 @@ def helpdesk_search(
     limit: int = Form(10)
 ):
     """
-    Search training corpus without LLM synthesis.
-    Returns raw search results for browsing.
+    Search training corpus by keyword matching.
+    Returns matching document snippets.
     """
-    results = rag_search(
-        query=query,
-        limit=limit,
-        collection_name="knowledge_base"
-    )
+    docs = load_corpus()
+    query_lower = query.lower()
+    query_words = [w for w in query_lower.split() if len(w) > 2]
 
-    formatted = []
-    for r in results:
-        formatted.append({
-            "text": r["text"],
-            "source_file": r.get("metadata", {}).get("source_file", ""),
-            "score": r.get("score", 0),
-            "chunk_index": r.get("metadata", {}).get("chunk_index", 0)
+    results = []
+    for doc in docs:
+        doc_lower = doc["text"].lower()
+        if not any(w in doc_lower for w in query_words):
+            continue
+
+        # Find the best matching snippet
+        best_pos = 0
+        best_score = 0
+        for i in range(0, len(doc_lower), 100):
+            chunk = doc_lower[i:i+500]
+            score = sum(1 for w in query_words if w in chunk)
+            if score > best_score:
+                best_score = score
+                best_pos = i
+
+        snippet = doc["text"][best_pos:best_pos+500]
+
+        results.append({
+            "text": snippet,
+            "source_file": doc["file"],
+            "score": best_score / max(len(query_words), 1),
+            "chunk_index": 0,
         })
 
+    # Sort by score descending
+    results.sort(key=lambda x: x["score"], reverse=True)
+
     return {
-        "results": formatted,
-        "count": len(formatted),
+        "results": results[:limit],
+        "count": len(results[:limit]),
         "query": query
     }
 
@@ -133,13 +157,3 @@ def helpdesk_search(
 def helpdesk_corpus_stats():
     """Get stats about the training corpus."""
     return get_corpus_stats()
-
-
-@router.post("/corpus/ingest")
-def helpdesk_ingest_corpus():
-    """
-    Re-ingest the training corpus.
-    Use after adding new training files.
-    """
-    result = ingest_training_corpus(clear_existing=True)
-    return result

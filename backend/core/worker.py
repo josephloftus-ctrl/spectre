@@ -25,10 +25,9 @@ from .database import (
 )
 from .files import INBOX_DIR, move_to_processed, move_to_failed
 from .engine import parse_excel_file, parse_file
-from .embeddings import embed_document
 from .analysis import (
     analyze_document, compare_with_previous, save_analysis_result,
-    check_ollama_available
+    check_ai_available
 )
 from .flag_checker import calculate_unit_score, calculate_comprehensive_score
 from .db.history import save_weekly_item_snapshot, get_week_ending_date
@@ -196,13 +195,9 @@ def process_parse_job(job: dict) -> dict:
             inventory_date=inventory_date
         )
 
-        # Queue scoring job first (fast, shows data on dashboard quickly)
+        # Queue scoring job (fast, shows data on dashboard quickly)
         score_job_id = str(uuid.uuid4())
         create_job(score_job_id, JobType.SCORE, file_id, priority=1)
-
-        # Queue embedding job (slower, lower priority)
-        embed_job_id = str(uuid.uuid4())
-        create_job(embed_job_id, JobType.EMBED, file_id, priority=-1)
 
         return {
             "success": True,
@@ -217,48 +212,9 @@ def process_parse_job(job: dict) -> dict:
 
 
 def process_embed_job(job: dict) -> dict:
-    """Process an embedding job."""
-    file_id = job.get("file_id")
-    if not file_id:
-        return {"error": "No file_id in job"}
-
-    file_record = get_file(file_id)
-    if not file_record:
-        return {"error": f"File {file_id} not found"}
-
-    try:
-        # Get parsed data
-        parsed_data = file_record.get("parsed_data")
-        if isinstance(parsed_data, str):
-            try:
-                parsed_data = json.loads(parsed_data)
-            except json.JSONDecodeError as e:
-                return {"error": f"Invalid JSON in parsed_data: {e}"}
-
-        if not parsed_data:
-            return {"error": "No parsed data available"}
-
-        # Generate embeddings with date metadata - inventory files go to inventory collection
-        result = embed_document(
-            file_id=file_id,
-            parsed_data=parsed_data,
-            site_id=file_record.get("site_id"),
-            filename=file_record.get("filename"),
-            file_date=file_record.get("created_at"),
-            collection_name="inventory"
-        )
-
-        # Queue analysis job if Ollama is available (scoring already done after parse)
-        if check_ollama_available():
-            analyze_job_id = str(uuid.uuid4())
-            create_job(analyze_job_id, JobType.ANALYZE, file_id, priority=-2)
-            logger.info(f"Queued analysis job for file {file_id}")
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Failed to embed file {file_id}: {e}")
-        return {"error": str(e)}
+    """Legacy embed job handler — embeddings pipeline has been removed."""
+    logger.info(f"Skipping embed job (pipeline removed): {job.get('file_id')}")
+    return {"success": True, "skipped": True, "reason": "Embeddings pipeline removed"}
 
 
 def process_analyze_job(job: dict) -> dict:

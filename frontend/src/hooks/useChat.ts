@@ -11,7 +11,7 @@ import {
   ChatSession,
   ChatMessage as DbChatMessage
 } from '@/lib/db'
-import { unifiedChatStream, getAIConfig, SYSTEM_PROMPTS } from '@/lib/ollama'
+import { chatStream, SYSTEM_PROMPTS } from '@/lib/ai'
 
 // Operations-focused system prompt with memory injection
 const buildSystemPrompt = (memories: string[]) => `${SYSTEM_PROMPTS.inventoryAnalyst}
@@ -95,16 +95,15 @@ export function useChat() {
     }
 
     try {
-      const config = getAIConfig()
       const chatMsgs = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
 
       let fullResponse = ''
-      for await (const chunk of unifiedChatStream(chatMsgs, buildSystemPrompt(memories))) {
+      for await (const chunk of chatStream(chatMsgs, buildSystemPrompt(memories))) {
         fullResponse += chunk
         setStreamingContent(fullResponse)
       }
 
-      const assistantMsg = await addChatMessage(sessionId, 'assistant', fullResponse, config.ollamaModel, config.provider)
+      const assistantMsg = await addChatMessage(sessionId, 'assistant', fullResponse, 'claude')
       setMessages(prev => [...prev, assistantMsg])
       setStreamingContent('')
       await loadSessions()

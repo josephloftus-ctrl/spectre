@@ -5,9 +5,8 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Form, Query
 from typing import Optional
 import uuid
-import requests
 
-from backend.core.config import settings
+from backend.core import llm
 from backend.core.memory import (
     get_today_items, get_upcoming_items, search_memory, embed_note
 )
@@ -79,19 +78,9 @@ def ai_briefing(date: Optional[str] = Query(None)):
 
         prompt = " ".join(prompt_parts) + " Keep it under 100 words."
 
-        response = requests.post(
-            f"{settings.OLLAMA_URL}/api/generate",
-            json={
-                "model": settings.LLM_MODEL,
-                "prompt": prompt,
-                "stream": False
-            },
-            timeout=30
-        )
-
-        if response.ok:
-            data = response.json()
-            briefing["summary"] = data.get("response", "").strip()
+        summary = llm.generate(prompt, max_tokens=200, temperature=0.5)
+        if summary:
+            briefing["summary"] = summary.strip()
 
     except Exception as e:
         briefing["summary"] = f"Unable to generate AI summary: {str(e)}"
@@ -109,7 +98,6 @@ def create_memory_note(
 ):
     """
     Create a quick note in living memory.
-    Notes are automatically embedded and searchable.
     """
     note_id = str(uuid.uuid4())
     tag_list = [t.strip() for t in tags.split(",")] if tags else []

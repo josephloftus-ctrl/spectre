@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
@@ -9,15 +9,13 @@ import {
   Mail, Database, Bell, HardDrive, Cpu, RefreshCw, Check, X,
   Sparkles, Server, FileSpreadsheet, Cog, AlertTriangle
 } from 'lucide-react'
-import { checkOllamaStatus, checkAIStatus, STANDARD_MODEL, EMBED_MODEL } from '@/lib/ollama'
-import { fetchStats, fetchWorkerStatus, fetchEmbeddingStats, fetchJobs, fetchAnomalies, retryFailedJobs } from '@/lib/api'
+import { checkAIStatus } from '@/lib/ai'
+import { fetchStats, fetchWorkerStatus, fetchJobs, fetchAnomalies, retryFailedJobs } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 export function SettingsPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean } | null>(null)
-  const [ollamaChecking, setOllamaChecking] = useState(false)
 
   // Debug menu state
   const [debugTapCount, setDebugTapCount] = useState(0)
@@ -25,7 +23,7 @@ export function SettingsPage() {
   const [retrying, setRetrying] = useState(false)
 
   // System status queries
-  const { data: aiStatus } = useQuery({
+  const { data: aiStatus, refetch: refetchAI } = useQuery({
     queryKey: ['ai-status'],
     queryFn: checkAIStatus,
     refetchInterval: 30000
@@ -41,12 +39,6 @@ export function SettingsPage() {
     queryKey: ['worker-status'],
     queryFn: fetchWorkerStatus,
     refetchInterval: 10000
-  })
-
-  const { data: embeddingStats } = useQuery({
-    queryKey: ['embedding-stats'],
-    queryFn: fetchEmbeddingStats,
-    refetchInterval: 30000
   })
 
   // Debug-only queries
@@ -85,20 +77,6 @@ export function SettingsPage() {
     }
   }
 
-  const checkOllama = async () => {
-    setOllamaChecking(true)
-    try {
-      const status = await checkOllamaStatus()
-      setOllamaStatus({ available: status.available })
-    } finally {
-      setOllamaChecking(false)
-    }
-  }
-
-  useEffect(() => {
-    checkOllama()
-  }, [])
-
   return (
     <div className="space-y-6">
       <div>
@@ -106,24 +84,24 @@ export function SettingsPage() {
         <p className="text-muted-foreground">Configure your preferences</p>
       </div>
 
-      {/* AI Configuration - Simplified */}
-      <Card className={ollamaStatus?.available ? 'border-primary/30' : ''}>
+      {/* AI Configuration */}
+      <Card className={aiStatus?.available ? 'border-primary/30' : ''}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Cpu className="h-5 w-5 text-primary" />
             AI Assistant
           </CardTitle>
           <CardDescription>
-            Powered by Ollama running locally
+            Powered by Claude via backend proxy
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Connection Status */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {ollamaStatus === null ? (
+              {aiStatus === undefined ? (
                 <span className="text-sm text-muted-foreground">Checking...</span>
-              ) : ollamaStatus.available ? (
+              ) : aiStatus?.available ? (
                 <>
                   <Check className="h-4 w-4 text-emerald-500" />
                   <span className="text-sm text-emerald-500">Connected</span>
@@ -131,41 +109,41 @@ export function SettingsPage() {
               ) : (
                 <>
                   <X className="h-4 w-4 text-destructive" />
-                  <span className="text-sm text-destructive">Not Connected</span>
+                  <span className="text-sm text-destructive">Not Configured</span>
                 </>
               )}
             </div>
             <Button
               variant="ghost"
               size="sm"
-              onClick={checkOllama}
-              disabled={ollamaChecking}
+              onClick={() => refetchAI()}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${ollamaChecking ? 'animate-spin' : ''}`} />
+              <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
 
           {/* Model Info */}
-          <div className="p-3 rounded-lg bg-muted/50 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Chat Model</span>
-              <code className="bg-background px-2 py-0.5 rounded">{STANDARD_MODEL}</code>
+          {aiStatus?.available && (
+            <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Chat Model</span>
+                <code className="bg-background px-2 py-0.5 rounded">{aiStatus.model}</code>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Analysis Model</span>
+                <code className="bg-background px-2 py-0.5 rounded">{aiStatus.analysis_model}</code>
+              </div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Embedding Model</span>
-              <code className="bg-background px-2 py-0.5 rounded">{EMBED_MODEL}</code>
-            </div>
-          </div>
+          )}
 
           {/* Setup instructions if not connected */}
-          {!ollamaStatus?.available && (
+          {!aiStatus?.available && (
             <div className="p-4 rounded-lg bg-muted/50 text-sm space-y-2">
-              <p className="font-medium">To use Ollama:</p>
+              <p className="font-medium">To configure Claude:</p>
               <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>Install from <span className="font-mono">ollama.ai</span></li>
-                <li>Run: <span className="font-mono">ollama pull {STANDARD_MODEL}</span></li>
-                <li>Run: <span className="font-mono">ollama pull {EMBED_MODEL}</span></li>
+                <li>Set <span className="font-mono">CLAUDE_API_KEY</span> in your backend environment</li>
+                <li>Restart the backend server</li>
                 <li>Click Refresh above</li>
               </ol>
             </div>
@@ -269,14 +247,7 @@ export function SettingsPage() {
                 "h-2 w-2 rounded-full",
                 aiStatus?.available ? "bg-emerald-500" : "bg-yellow-500"
               )} />
-              <span className="text-sm">AI: {aiStatus?.available ? 'Ollama' : 'Offline'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={cn(
-                "h-2 w-2 rounded-full",
-                embeddingStats?.available ? "bg-emerald-500" : "bg-yellow-500"
-              )} />
-              <span className="text-sm">Vector: {embeddingStats?.available ? 'Ready' : 'Unavailable'}</span>
+              <span className="text-sm">AI: {aiStatus?.available ? 'Claude' : 'Offline'}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -369,16 +340,6 @@ export function SettingsPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Embedding Stats */}
-            {embeddingStats && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Embeddings</p>
-                <p className="text-sm text-muted-foreground">
-                  {stats?.embeddings || 0} chunks indexed • Model: {embeddingStats.model || EMBED_MODEL}
-                </p>
               </div>
             )}
 

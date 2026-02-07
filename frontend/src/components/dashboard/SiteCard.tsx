@@ -8,11 +8,13 @@ import {
   getStatusLabel,
   getTrendColor,
 } from '@/components/ui/status-indicator'
+import { Sparkline } from '@/components/TrendChart'
 
 interface SiteCardProps {
   site: UnitScore
   onClick?: () => void
   selected?: boolean
+  sparklineValues?: number[]
 }
 
 function formatCurrency(amount: number): string {
@@ -37,7 +39,16 @@ function getBorderColor(status: UnitScore['status']): string {
   }
 }
 
-export function SiteCard({ site, onClick, selected }: SiteCardProps) {
+function getSparklineColor(status: UnitScore['status']): 'blue' | 'green' | 'amber' | 'red' {
+  switch (status) {
+    case 'critical': return 'red'
+    case 'warning': return 'amber'
+    case 'healthy': return 'green'
+    case 'clean': return 'green'
+  }
+}
+
+export function SiteCard({ site, onClick, selected, sparklineValues }: SiteCardProps) {
   const TrendIcon = site.trend === 'up' ? TrendingUp :
     site.trend === 'down' ? TrendingDown : Minus
 
@@ -80,12 +91,22 @@ export function SiteCard({ site, onClick, selected }: SiteCardProps) {
           )}
         </div>
 
-        {/* Value */}
-        <div className="mb-3">
-          <p className="text-2xl font-bold font-head">
-            {formatCurrency(site.total_value)}
-          </p>
-          <p className="text-xs text-muted-foreground">Total Value</p>
+        {/* Value + Sparkline */}
+        <div className="flex items-end justify-between gap-2 mb-3">
+          <div>
+            <p className="text-2xl font-bold font-head">
+              {formatCurrency(site.total_value)}
+            </p>
+            <p className="text-xs text-muted-foreground">Total Value</p>
+          </div>
+          {sparklineValues && sparklineValues.length >= 2 && (
+            <Sparkline
+              values={sparklineValues}
+              color={getSparklineColor(site.status)}
+              width={64}
+              height={24}
+            />
+          )}
         </div>
 
         {/* Footer: Flags */}

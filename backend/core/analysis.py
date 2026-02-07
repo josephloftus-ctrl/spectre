@@ -1,5 +1,5 @@
 """
-AI Analysis Service - Background document analysis using Ollama
+AI Analysis Service - Background document analysis using Claude API
 
 Provides:
 - Anomaly detection for inventory data
@@ -25,13 +25,13 @@ COMPARISON_HISTORY_LIMIT = 5          # Max previous files to compare against
 ANALYSIS_ROWS_LIMIT = 50              # Max rows to send for AI analysis
 
 
-def check_ollama_available() -> bool:
-    """Check if Ollama is running and model is available."""
+def check_ai_available() -> bool:
+    """Check if AI is available."""
     return llm.check_available()
 
 
 def generate_completion(prompt: str, system: str = None, max_tokens: int = 1000) -> Optional[str]:
-    """Generate a completion using Ollama."""
+    """Generate a completion using Claude."""
     return llm.generate(prompt, system=system, max_tokens=max_tokens)
 
 

@@ -358,7 +358,6 @@ def delete_file(file_id: str) -> Dict[str, Any]:
     Removes: physical files, database records, embeddings.
     """
     from .database import get_file, delete_file_record
-    from .embeddings import delete_file_embeddings
 
     # Get file info first
     file_record = get_file(file_id)
@@ -403,13 +402,6 @@ def delete_file(file_id: str) -> Dict[str, Any]:
         except Exception as e:
             errors.append(f"Failed to delete failed dir: {e}")
 
-    # Delete embeddings from ChromaDB
-    try:
-        embedding_count = delete_file_embeddings(file_id)
-    except Exception as e:
-        embedding_count = 0
-        errors.append(f"Failed to delete embeddings: {e}")
-
     # Delete database records
     db_deleted = delete_file_record(file_id)
 
@@ -417,7 +409,6 @@ def delete_file(file_id: str) -> Dict[str, Any]:
         "success": db_deleted,
         "file_id": file_id,
         "deleted_paths": deleted_paths,
-        "embeddings_deleted": embedding_count,
         "errors": errors if errors else None
     }
 

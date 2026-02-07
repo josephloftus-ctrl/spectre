@@ -16,8 +16,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, date
 from dataclasses import dataclass, asdict
 
-from .embeddings import search
-from .corpus import KNOWLEDGE_COLLECTION
+from .corpus import get_corpus_text
 from . import llm
 
 logger = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ class StandupContent:
 
 
 def get_llm_response(prompt: str, system: str = "", temperature: float = 0.7) -> Optional[str]:
-    """Get response from Ollama LLM."""
+    """Get response from Claude LLM."""
     return llm.chat(prompt, system=system if system else None, temperature=temperature)
 
 
@@ -115,25 +114,12 @@ def generate_safety_moment(topic_hint: Optional[str] = None) -> Dict[str, Any]:
     """
     Generate a safety moment from training corpus and web research.
     """
-    # Search training corpus for safety content
-    search_query = topic_hint or "food safety best practices kitchen hygiene"
-    rag_results = search(
-        query=search_query,
-        limit=5,
-        collection_name=KNOWLEDGE_COLLECTION
-    )
-
-    # Build context from RAG results
-    rag_context = ""
-    sources = []
-    if rag_results:
-        for r in rag_results:
-            rag_context += f"\n- {r['text'][:500]}"
-            if r.get("metadata", {}).get("source_file"):
-                sources.append(r["metadata"]["source_file"])
-    else:
-        logger.warning("No training materials found for safety moment - knowledge base may be empty")
-        rag_context = "\n(No training materials available - using general food safety knowledge)"
+    # Load training corpus text (truncated to keep context manageable)
+    rag_context = get_corpus_text(max_chars=8000)
+    sources = ["Training Materials"]
+    if not rag_context:
+        logger.warning("No training materials found for safety moment")
+        rag_context = "(No training materials available - using general food safety knowledge)"
 
     # Get current food safety news (use current year)
     current_year = datetime.now().year
@@ -243,19 +229,9 @@ def generate_manager_prompt(focus_areas: Optional[List[str]] = None) -> Dict[str
     today = datetime.now()
     day_of_week = today.strftime("%A")
 
-    # Search training corpus for management guidance
-    rag_results = search(
-        query="manager responsibilities team leadership daily operations",
-        limit=5,
-        collection_name=KNOWLEDGE_COLLECTION
-    )
-
-    rag_context = ""
-    sources = []
-    for r in rag_results:
-        rag_context += f"\n- {r['text'][:400]}"
-        if r.get("metadata", {}).get("source_file"):
-            sources.append(r["metadata"]["source_file"])
+    # Load training corpus text (truncated)
+    rag_context = get_corpus_text(max_chars=6000)
+    sources = ["Training Materials"] if rag_context else []
 
     focus_str = ""
     if focus_areas:
